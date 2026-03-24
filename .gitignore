@@ -1,0 +1,14 @@
+# C# and related tools
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+Properties/
+.dotnet/
+.aspnet/
+.local/
+**/Directory.Build.local.props
+__pycache__
