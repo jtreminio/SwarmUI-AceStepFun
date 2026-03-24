@@ -71,10 +71,87 @@ public class AceStepFunExtension : Extension
         ));
         OrderPriority += 1;
 
+        LmModel = T2IParamTypes.Register<string>(new T2IParamType(
+            Name: "AceStepFun LM Model",
+            Description: "LM Model.",
+            Default: "AceStep/qwen_1.7b_ace15.safetensors",
+            GetValues: _ => LmModelOptions,
+            Group: AceStepFunGroup,
+            OrderPriority: OrderPriority,
+            FeatureFlag: ComfyUIFeatureFlag,
+            DoNotPreview: true
+        ));
+        OrderPriority += 1;
+
+        Duration = T2IParamTypes.Register<double>(new T2IParamType(
+            Name: "AceStepFun Duration",
+            Description: "Audio duration in seconds.",
+            Default: "120",
+            Min: 1,
+            Max: 600,
+            Step: 1,
+            Group: AceStepFunGroup,
+            OrderPriority: OrderPriority,
+            FeatureFlag: ComfyUIFeatureFlag,
+            DoNotPreview: true
+        ));
+        OrderPriority += 1;
+
         Style = T2IParamTypes.Register<string>(new T2IParamType(
             Name: "AceStepFun Style",
             Description: "Style or genre tags.",
             Default: "",
+            ViewType: ParamViewType.PROMPT,
+            Group: AceStepFunGroup,
+            OrderPriority: OrderPriority,
+            FeatureFlag: ComfyUIFeatureFlag,
+            DoNotPreview: true
+        ));
+        OrderPriority += 1;
+
+        Bpm = T2IParamTypes.Register<long>(new T2IParamType(
+            Name: "AceStepFun BPM",
+            Description: "Beats per minute.",
+            Default: "120",
+            Min: 40,
+            Max: 300,
+            Step: 1,
+            Group: AceStepFunGroup,
+            OrderPriority: OrderPriority,
+            FeatureFlag: ComfyUIFeatureFlag,
+            DoNotPreview: true
+        ));
+        OrderPriority += 1;
+
+        TimeSignature = T2IParamTypes.Register<string>(new T2IParamType(
+            Name: "AceStepFun Time Signature",
+            Description: "Time signature.",
+            Default: "4",
+            GetValues: s => T2IParamTypes.Text2AudioTimeSignature.Type.GetValues?.Invoke(s),
+            Group: AceStepFunGroup,
+            OrderPriority: OrderPriority,
+            FeatureFlag: ComfyUIFeatureFlag,
+            DoNotPreview: true
+        ));
+        OrderPriority += 1;
+
+        Language = T2IParamTypes.Register<string>(new T2IParamType(
+            Name: "AceStepFun Language",
+            Description: "Language for the prompt.",
+            Default: "en",
+            GetValues: s => T2IParamTypes.Text2AudioLanguage.Type.GetValues?.Invoke(s),
+            Group: AceStepFunGroup,
+            OrderPriority: OrderPriority,
+            FeatureFlag: ComfyUIFeatureFlag,
+            DoNotPreview: true
+        ));
+        OrderPriority += 1;
+
+        KeyScale = T2IParamTypes.Register<string>(new T2IParamType(
+            Name: "AceStepFun Key Scale",
+            Description: "Key and scale for the music.",
+            Default: "E minor",
+            GetValues: s => T2IParamTypes.Text2AudioKeyScale.Type.GetValues?.Invoke(s),
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
@@ -126,83 +203,6 @@ public class AceStepFunExtension : Extension
             DoNotPreview: true
         ));
         OrderPriority += 1;
-
-        LmModel = T2IParamTypes.Register<string>(new T2IParamType(
-            Name: "AceStepFun LM Model",
-            Description: "LM Model.",
-            Default: "AceStep/qwen_1.7b_ace15.safetensors",
-            GetValues: _ => LmModelOptions,
-            Group: AceStepFunGroup,
-            OrderPriority: OrderPriority,
-            FeatureFlag: ComfyUIFeatureFlag,
-            DoNotPreview: true
-        ));
-        OrderPriority += 1;
-
-        Duration = T2IParamTypes.Register<double>(new T2IParamType(
-            Name: "AceStepFun Duration",
-            Description: "Audio duration in seconds.",
-            Default: "120",
-            Min: 1,
-            Max: 600,
-            Step: 1,
-            ViewType: ParamViewType.SLIDER,
-            Group: AceStepFunGroup,
-            OrderPriority: OrderPriority,
-            FeatureFlag: ComfyUIFeatureFlag,
-            DoNotPreview: true
-        ));
-        OrderPriority += 1;
-
-        Bpm = T2IParamTypes.Register<long>(new T2IParamType(
-            Name: "AceStepFun BPM",
-            Description: "Beats per minute.",
-            Default: "120",
-            Min: 40,
-            Max: 300,
-            Step: 1,
-            ViewType: ParamViewType.SLIDER,
-            Group: AceStepFunGroup,
-            OrderPriority: OrderPriority,
-            FeatureFlag: ComfyUIFeatureFlag,
-            DoNotPreview: true
-        ));
-        OrderPriority += 1;
-
-        TimeSignature = T2IParamTypes.Register<string>(new T2IParamType(
-            Name: "AceStepFun Time Signature",
-            Description: "Time signature.",
-            Default: "4",
-            GetValues: s => T2IParamTypes.Text2AudioTimeSignature.Type.GetValues?.Invoke(s),
-            Group: AceStepFunGroup,
-            OrderPriority: OrderPriority,
-            FeatureFlag: ComfyUIFeatureFlag,
-            DoNotPreview: true
-        ));
-        OrderPriority += 1;
-
-        Language = T2IParamTypes.Register<string>(new T2IParamType(
-            Name: "AceStepFun Language",
-            Description: "Language for the prompt.",
-            Default: "en",
-            GetValues: s => T2IParamTypes.Text2AudioLanguage.Type.GetValues?.Invoke(s),
-            Group: AceStepFunGroup,
-            OrderPriority: OrderPriority,
-            FeatureFlag: ComfyUIFeatureFlag,
-            DoNotPreview: true
-        ));
-        OrderPriority += 1;
-
-        KeyScale = T2IParamTypes.Register<string>(new T2IParamType(
-            Name: "AceStepFun Key Scale",
-            Description: "Key and scale for the music.",
-            Default: "E minor",
-            GetValues: s => T2IParamTypes.Text2AudioKeyScale.Type.GetValues?.Invoke(s),
-            Group: AceStepFunGroup,
-            OrderPriority: OrderPriority,
-            FeatureFlag: ComfyUIFeatureFlag,
-            DoNotPreview: true
-        ));
 
         Prompt = T2IParamTypes.Register<string>(new T2IParamType(
             Name: "AceStepFun Prompt",
