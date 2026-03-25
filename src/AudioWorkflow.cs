@@ -26,6 +26,12 @@ internal class AudioWorkflow(WorkflowGenerator g)
         double AuraShift = 3
     );
 
+    private sealed record ExistingLoraChain(
+        JArray RootModelPath,
+        List<AceStepLora> Loras,
+        bool RequiresNormalization
+    );
+
     private const int AudioIdBase = 64100;
     private const string DefaultClip1 = "AceStep/qwen_0.6b_ace15.safetensors";
     private const string DefaultClip2 = "AceStep/qwen_1.7b_ace15.safetensors";
@@ -123,9 +129,11 @@ internal class AudioWorkflow(WorkflowGenerator g)
             ["weight_dtype"] = "default"
         }, g.GetStableDynamicID(AudioIdBase + 20, 0));
 
+        JArray modelPath = ApplyConfiguredLoras(new JArray(modelNode, 0));
+
         string samplingNode = g.CreateNode(NodeTypes.ModelSamplingAuraFlow, new JObject
         {
-            ["model"] = new JArray(modelNode, 0),
+            ["model"] = modelPath,
             ["shift"] = Params.AuraShift
         }, g.GetStableDynamicID(AudioIdBase + 25, 0));
 
@@ -239,7 +247,9 @@ internal class AudioWorkflow(WorkflowGenerator g)
                     && clipTok is JArray clipPath
                     && clipPath.Count > 0)
                 {
-                    referencedClipNodeIds.Add($"{clipPath[0]}");
+                    JArray normalizedClipPath = NormalizeClipPath(clipPath);
+                    encodeInputs["clip"] = normalizedClipPath;
+                    referencedClipNodeIds.Add($"{normalizedClipPath[0]}");
                 }
                 aceEncodeNodeIds.Add(prop.Name);
                 bool isNegative = string.IsNullOrWhiteSpace($"{encodeInputs["lyrics"]}")
@@ -298,7 +308,9 @@ internal class AudioWorkflow(WorkflowGenerator g)
             samplerInputs["cfg"] = Params.SamplerCfg;
             samplerInputs["sampler_name"] = Params.AudioSamplerName;
             samplerInputs["scheduler"] = Params.AudioScheduler;
-            samplerInputs["model"] = EnsureAuraModelInput(samplerInputs);
+            JArray modelInput = GetInputPath(samplerInputs, "model");
+            modelInput = ApplyConfiguredLorasToSamplerModel(modelInput);
+            samplerInputs["model"] = EnsureAuraModelInput(modelInput);
             if (NeedsZeroedNegativeInput(samplerInputs))
             {
                 samplersNeedingZeroedNegative.Add(samplerInputs);
@@ -362,30 +374,196 @@ internal class AudioWorkflow(WorkflowGenerator g)
         return false;
     }
 
-    private JArray EnsureAuraModelInput(JObject samplerInputs)
+    private JArray ApplyConfiguredLorasToSamplerModel(JArray modelPath)
     {
-        if (!samplerInputs.TryGetValue("model", out JToken modelTok)
-            || modelTok is not JArray modelPath || modelPath.Count < 2)
+        if (TryGetAuraInputs(modelPath, out JObject auraInputs))
+        {
+            JArray innerModelPath = GetInputPath(auraInputs, "model");
+            auraInputs["model"] = ApplyConfiguredLoras(innerModelPath);
+            return modelPath;
+        }
+        return ApplyConfiguredLoras(modelPath);
+    }
+
+    private JArray ApplyConfiguredLoras(JArray modelPath)
+    {
+        if (modelPath.Count < 2)
+        {
+            return modelPath;
+        }
+
+        ExistingLoraChain existingChain = ExtractExistingLoraChain(modelPath);
+        List<AceStepLora> configuredLoras = AceStepLoraParser.ResolveRelevantLoras(g.UserInput, g.ModelFolderFormat);
+        List<AceStepLora> combinedLoras = [];
+        HashSet<string> seenLoras = [];
+
+        foreach (AceStepLora lora in existingChain.Loras)
+        {
+            AddLoraIfNew(combinedLoras, seenLoras, lora);
+        }
+        foreach (AceStepLora lora in configuredLoras)
+        {
+            AddLoraIfNew(combinedLoras, seenLoras, lora);
+        }
+
+        if (!existingChain.RequiresNormalization
+            && existingChain.Loras.Count == combinedLoras.Count
+            && LoraListsMatch(existingChain.Loras, combinedLoras))
+        {
+            return modelPath;
+        }
+
+        JArray patchedModelPath = existingChain.RootModelPath;
+        foreach (AceStepLora lora in combinedLoras)
+        {
+            string loraNode = g.CreateNode(NodeTypes.LoraLoaderModelOnly, new JObject
+            {
+                ["model"] = patchedModelPath,
+                ["lora_name"] = lora.ModelName,
+                ["strength_model"] = lora.Weight
+            });
+            patchedModelPath = new JArray(loraNode, 0);
+        }
+
+        return patchedModelPath;
+    }
+
+    private ExistingLoraChain ExtractExistingLoraChain(JArray modelPath)
+    {
+        List<AceStepLora> loras = [];
+        bool requiresNormalization = false;
+        JArray currentPath = modelPath;
+
+        while (TryGetSourceNode(currentPath, out JObject sourceNode)
+            && sourceNode["inputs"] is JObject sourceInputs)
+        {
+            string classType = $"{sourceNode["class_type"]}";
+            if (classType != NodeTypes.LoraLoader && classType != NodeTypes.LoraLoaderModelOnly)
+            {
+                break;
+            }
+
+            requiresNormalization = requiresNormalization || classType == NodeTypes.LoraLoader;
+            if (!TryReadExistingLora(sourceInputs, out AceStepLora lora))
+            {
+                break;
+            }
+            if (!TryGetInputPath(sourceInputs, "model", out JArray nextPath))
+            {
+                break;
+            }
+
+            loras.Add(lora);
+            currentPath = nextPath;
+        }
+
+        loras.Reverse();
+        return new ExistingLoraChain(currentPath, loras, requiresNormalization);
+    }
+
+    private static bool TryReadExistingLora(JObject sourceInputs, out AceStepLora lora)
+    {
+        lora = null;
+        if (!sourceInputs.TryGetValue("lora_name", out JToken loraNameTok))
+        {
+            return false;
+        }
+
+        double weight = 1;
+        if (sourceInputs.TryGetValue("strength_model", out JToken strengthTok))
+        {
+            weight = strengthTok.Value<double>();
+        }
+
+        string loraName = $"{loraNameTok}";
+        if (string.IsNullOrWhiteSpace(loraName))
+        {
+            return false;
+        }
+
+        lora = new AceStepLora(loraName, weight);
+        return true;
+    }
+
+    private static void AddLoraIfNew(List<AceStepLora> loras, HashSet<string> seenLoras, AceStepLora lora)
+    {
+        string signature = GetLoraSignature(lora);
+        if (seenLoras.Add(signature))
+        {
+            loras.Add(lora);
+        }
+    }
+
+    private static string GetLoraSignature(AceStepLora lora)
+    {
+        return $"{lora.ModelName}|{lora.Weight}";
+    }
+
+    private static bool LoraListsMatch(List<AceStepLora> first, List<AceStepLora> second)
+    {
+        if (first.Count != second.Count)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < first.Count; i++)
+        {
+            if (GetLoraSignature(first[i]) != GetLoraSignature(second[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private JArray NormalizeClipPath(JArray clipPath)
+    {
+        JArray currentPath = clipPath;
+        while (TryGetSourceNode(currentPath, out JObject sourceNode)
+            && $"{sourceNode["class_type"]}" == NodeTypes.LoraLoader
+            && sourceNode["inputs"] is JObject sourceInputs
+            && TryGetInputPath(sourceInputs, "clip", out JArray nextPath))
+        {
+            currentPath = nextPath;
+        }
+
+        return currentPath;
+    }
+
+    private JArray EnsureAuraModelInput(JArray modelPath)
+    {
+        if (modelPath.Count < 2)
         {
             return [];
         }
-        string sourceNodeId = $"{modelPath[0]}";
-        if (g.Workflow.TryGetValue(sourceNodeId, out JToken sourceTok)
-            && sourceTok is JObject sourceNode
-            && $"{sourceNode["class_type"]}" == NodeTypes.ModelSamplingAuraFlow)
+
+        if (TryGetAuraInputs(modelPath, out JObject auraInputs))
         {
-            if (sourceNode["inputs"] is JObject sourceInputs)
-            {
-                sourceInputs["shift"] = Params.AuraShift;
-            }
+            auraInputs["shift"] = Params.AuraShift;
             return modelPath;
         }
+
         string auraNode = g.CreateNode(NodeTypes.ModelSamplingAuraFlow, new JObject
         {
             ["model"] = modelPath,
             ["shift"] = Params.AuraShift
         });
         return new JArray(auraNode, 0);
+    }
+
+    private bool TryGetAuraInputs(JArray modelPath, out JObject auraInputs)
+    {
+        auraInputs = null;
+        if (!TryGetSourceNode(modelPath, out JObject sourceNode)
+            || $"{sourceNode["class_type"]}" != NodeTypes.ModelSamplingAuraFlow
+            || sourceNode["inputs"] is not JObject sourceInputs)
+        {
+            return false;
+        }
+
+        auraInputs = sourceInputs;
+        return true;
     }
 
     private void EnsureZeroedNegativeInput(JObject samplerInputs)
@@ -527,6 +705,34 @@ internal class AudioWorkflow(WorkflowGenerator g)
     private static bool IsInputFromNodeSet(JObject inputs, string inputName, HashSet<string> nodeIds)
     {
         return TryGetInputSourceId(inputs, inputName, out string sourceNodeId) && nodeIds.Contains(sourceNodeId);
+    }
+
+    private static JArray GetInputPath(JObject inputs, string inputName)
+    {
+        return TryGetInputPath(inputs, inputName, out JArray path) ? path : [];
+    }
+
+    private static bool TryGetInputPath(JObject inputs, string inputName, out JArray path)
+    {
+        path = null;
+        if (!inputs.TryGetValue(inputName, out JToken inputTok) || inputTok is not JArray rawPath || rawPath.Count < 1)
+        {
+            return false;
+        }
+        path = rawPath;
+        return true;
+    }
+
+    private bool TryGetSourceNode(JArray path, out JObject sourceNode)
+    {
+        sourceNode = null;
+        if (path.Count < 1)
+        {
+            return false;
+        }
+        string sourceNodeId = $"{path[0]}";
+        return g.Workflow.TryGetValue(sourceNodeId, out JToken sourceTok)
+            && (sourceNode = sourceTok as JObject) is not null;
     }
 
     private static bool TryGetInputSourceId(JObject inputs, string inputName, out string sourceNodeId)

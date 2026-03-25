@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using AceStepFun;
 using Newtonsoft.Json.Linq;
+using SwarmUI.Core;
 using SwarmUI.Builtin_ComfyUIBackend;
 using SwarmUI.Text2Image;
 using Xunit;
@@ -219,6 +220,107 @@ public class AudioWorkflowTests
     }
 
     [Fact]
+    public void IsExtensionActive_IsTrue_ForAceStepMainModelWithAudioLoraOnly()
+    {
+        EnsureParamsRegistered();
+
+        T2IParamInput input = new(null);
+        input.Set(T2IParamTypes.Model, FakeAceStepModel());
+        input.Set(T2IParamTypes.Loras, ["audio-lora"]);
+        input.Set(T2IParamTypes.LoraWeights, ["0.8"]);
+        input.Set(T2IParamTypes.LoraSectionConfinement, [$"{AceStepFunExtension.SectionID_Audio}"]);
+
+        WorkflowGenerator generator = new()
+        {
+            UserInput = input,
+            Workflow = new JObject()
+        };
+
+        Runner runner = new(generator);
+        Assert.True(InvokeIsExtensionActive(runner));
+    }
+
+    [Fact]
+    public void ApplyConfiguredLoras_AddsModelOnlyLoaders_ForGlobalAndAudioPromptLoras()
+    {
+        EnsureParamsRegistered();
+        EnsureFakeLoraModel("global-lora");
+        EnsureFakeLoraModel("audio-lora");
+
+        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input, out WorkflowGenerator generator);
+        input.Set(T2IParamTypes.Loras, ["global-lora", "audio-lora"]);
+        input.Set(T2IParamTypes.LoraWeights, ["0.75", "0.5"]);
+        input.Set(T2IParamTypes.LoraSectionConfinement, ["0", $"{AceStepFunExtension.SectionID_Audio}"]);
+        generator.Workflow["4"] = new JObject
+        {
+            ["class_type"] = "UNETLoader",
+            ["inputs"] = new JObject
+            {
+                ["unet_name"] = "audio/acestep_v1.5_merge_sft_turbo_ta_0.5",
+                ["weight_dtype"] = "default"
+            }
+        };
+
+        JArray resultPath = InvokeApplyConfiguredLoras(audioWorkflow, new JArray("4", 0));
+
+        JObject audioLoraNode = Assert.IsType<JObject>(generator.Workflow[$"{resultPath[0]}"]);
+        Assert.Equal("LoraLoaderModelOnly", $"{audioLoraNode["class_type"]}");
+        JObject audioLoraInputs = Assert.IsType<JObject>(audioLoraNode["inputs"]);
+        Assert.Equal("audio-lora.safetensors", $"{audioLoraInputs["lora_name"]}");
+        Assert.Equal(0.5, audioLoraInputs["strength_model"]?.Value<double>());
+
+        JArray previousModelPath = Assert.IsType<JArray>(audioLoraInputs["model"]);
+        JObject globalLoraNode = Assert.IsType<JObject>(generator.Workflow[$"{previousModelPath[0]}"]);
+        Assert.Equal("LoraLoaderModelOnly", $"{globalLoraNode["class_type"]}");
+        JObject globalLoraInputs = Assert.IsType<JObject>(globalLoraNode["inputs"]);
+        Assert.Equal("global-lora.safetensors", $"{globalLoraInputs["lora_name"]}");
+        Assert.Equal(0.75, globalLoraInputs["strength_model"]?.Value<double>());
+    }
+
+    [Fact]
+    public void TryPatchExistingText2AudioGraph_ReplacesGenericLoraLoader_WithModelOnlyLoader()
+    {
+        EnsureFakeLoraModel("global-lora");
+
+        T2IParamInput input = new(null);
+        input.Set(T2IParamTypes.Loras, ["global-lora"]);
+        input.Set(T2IParamTypes.LoraWeights, ["0.8"]);
+        input.Set(T2IParamTypes.LoraSectionConfinement, ["0"]);
+
+        WorkflowGenerator generator = new()
+        {
+            UserInput = input,
+            Workflow = BuildPatchableWorkflowWithGenericLora()
+        };
+
+        Type audioWorkflowType = typeof(AceStepFunExtension).Assembly.GetType("AceStepFun.AudioWorkflow")
+            ?? throw new InvalidOperationException("Could not find AceStepFun.AudioWorkflow.");
+        object audioWorkflow = Activator.CreateInstance(audioWorkflowType, generator)
+            ?? throw new InvalidOperationException("Could not create AceStepFun.AudioWorkflow.");
+
+        bool patched = InvokeTryPatchExistingText2AudioGraph(audioWorkflow);
+
+        Assert.True(patched);
+
+        JObject samplerNode = Assert.IsType<JObject>(generator.Workflow["5"]);
+        JObject samplerInputs = Assert.IsType<JObject>(samplerNode["inputs"]);
+        JArray modelPath = Assert.IsType<JArray>(samplerInputs["model"]);
+        JObject auraNode = Assert.IsType<JObject>(generator.Workflow[$"{modelPath[0]}"]);
+        JObject auraInputs = Assert.IsType<JObject>(auraNode["inputs"]);
+        JArray loraModelPath = Assert.IsType<JArray>(auraInputs["model"]);
+        JObject loraNode = Assert.IsType<JObject>(generator.Workflow[$"{loraModelPath[0]}"]);
+        Assert.Equal("LoraLoaderModelOnly", $"{loraNode["class_type"]}");
+        JObject loraInputs = Assert.IsType<JObject>(loraNode["inputs"]);
+        Assert.Equal("global-lora.safetensors", $"{loraInputs["lora_name"]}");
+        Assert.Equal(0.8, loraInputs["strength_model"]?.Value<double>());
+
+        JObject positiveEncodeNode = Assert.IsType<JObject>(generator.Workflow["2"]);
+        JObject positiveEncodeInputs = Assert.IsType<JObject>(positiveEncodeNode["inputs"]);
+        JArray clipPath = Assert.IsType<JArray>(positiveEncodeInputs["clip"]);
+        Assert.Equal("1", $"{clipPath[0]}");
+    }
+
+    [Fact]
     public void TryPatchExistingText2AudioGraph_DoesNotThrow_WhenAuraNodeMustBeInserted()
     {
         WorkflowGenerator generator = new()
@@ -309,6 +411,22 @@ public class AudioWorkflowTests
         return Assert.IsType<bool>(result);
     }
 
+    private static JArray InvokeApplyConfiguredLoras(object audioWorkflow, JArray modelPath)
+    {
+        MethodInfo applyConfiguredLoras = audioWorkflow.GetType().GetMethod("ApplyConfiguredLoras", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Could not find ApplyConfiguredLoras.");
+        try
+        {
+            object result = applyConfiguredLoras.Invoke(audioWorkflow, [modelPath]);
+            return Assert.IsType<JArray>(result);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+    }
+
     private static string InvokeResolvePrompt(object audioWorkflow)
     {
         MethodInfo resolvePrompt = audioWorkflow.GetType().GetMethod("ResolvePrompt", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -327,8 +445,13 @@ public class AudioWorkflowTests
 
     private static object CreateAudioWorkflow(out T2IParamInput input)
     {
+        return CreateAudioWorkflow(out input, out _);
+    }
+
+    private static object CreateAudioWorkflow(out T2IParamInput input, out WorkflowGenerator generator)
+    {
         input = new T2IParamInput(null);
-        WorkflowGenerator generator = new()
+        generator = new WorkflowGenerator()
         {
             UserInput = input,
             Workflow = new JObject()
@@ -379,6 +502,21 @@ public class AudioWorkflowTests
         registerParameters.Invoke(null, []);
     }
 
+    private static void EnsureFakeLoraModel(string name)
+    {
+        if (!Program.T2IModelSets.TryGetValue("LoRA", out T2IModelHandler handler))
+        {
+            handler = new T2IModelHandler()
+            {
+                ModelType = "LoRA"
+            };
+            Program.T2IModelSets["LoRA"] = handler;
+        }
+
+        string fileName = $"{name}.safetensors";
+        handler.Models[fileName] = new T2IModel(handler, "/fake/loras", $"/fake/loras/{fileName}", fileName);
+    }
+
     private static T2IModel FakeAceStepModel()
     {
         return new T2IModel(null, "", "", "unit-test-ace-step")
@@ -390,6 +528,88 @@ public class AudioWorkflowTests
                 CompatClass = T2IModelClassSorter.CompatAceStep15
             }
         };
+    }
+
+    private static JObject BuildPatchableWorkflowWithGenericLora()
+    {
+        JObject workflow = BuildPatchableWorkflow();
+        workflow["2"] = new JObject
+        {
+            ["class_type"] = "TextEncodeAceStepAudio1.5",
+            ["inputs"] = new JObject
+            {
+                ["clip"] = new JArray("9", 1),
+                ["lyrics"] = "old lyrics",
+                ["tags"] = "old tags",
+                ["seed"] = 1,
+                ["bpm"] = 120,
+                ["duration"] = 10,
+                ["timesignature"] = "4",
+                ["language"] = "en",
+                ["keyscale"] = "C major",
+                ["generate_audio_codes"] = true,
+                ["cfg_scale"] = 2.0
+            }
+        };
+        workflow["3"] = new JObject
+        {
+            ["class_type"] = "TextEncodeAceStepAudio1.5",
+            ["inputs"] = new JObject
+            {
+                ["clip"] = new JArray("9", 1),
+                ["lyrics"] = "",
+                ["tags"] = "",
+                ["seed"] = 1,
+                ["bpm"] = 120,
+                ["duration"] = 10,
+                ["timesignature"] = "4",
+                ["language"] = "en",
+                ["keyscale"] = "C major",
+                ["generate_audio_codes"] = true,
+                ["cfg_scale"] = 2.0
+            }
+        };
+        workflow["9"] = new JObject
+        {
+            ["class_type"] = "LoraLoader",
+            ["inputs"] = new JObject
+            {
+                ["model"] = new JArray("4", 0),
+                ["clip"] = new JArray("1", 0),
+                ["lora_name"] = "global-lora.safetensors",
+                ["strength_model"] = 0.8,
+                ["strength_clip"] = 0.8
+            }
+        };
+        workflow["5"] = new JObject
+        {
+            ["class_type"] = "SwarmKSampler",
+            ["inputs"] = new JObject
+            {
+                ["model"] = new JArray("9", 0),
+                ["positive"] = new JArray("2", 0),
+                ["negative"] = new JArray("3", 0),
+                ["latent_image"] = new JArray("8", 0),
+                ["seed"] = 5,
+                ["steps"] = 20,
+                ["cfg"] = 7,
+                ["sampler_name"] = "euler",
+                ["scheduler"] = "normal",
+                ["start_at_step"] = 0,
+                ["end_at_step"] = 10000,
+                ["return_with_leftover_noise"] = "disable",
+                ["add_noise"] = "enable",
+                ["var_seed"] = 0,
+                ["var_seed_strength"] = 0,
+                ["sigma_min"] = -1,
+                ["sigma_max"] = -1,
+                ["rho"] = 7,
+                ["previews"] = "default",
+                ["tile_sample"] = false,
+                ["tile_size"] = 768
+            }
+        };
+        return workflow;
     }
 
     private static JObject BuildPatchableWorkflow()
