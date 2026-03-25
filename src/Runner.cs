@@ -55,7 +55,8 @@ public class Runner(WorkflowGenerator g)
             || HasRaw(AceStepFunExtension.Text2AudioLmModel)
             || HasRaw(AceStepFunExtension.Text2AudioAudioCfg)
             || HasRaw(AceStepFunExtension.Text2AudioSamplerCfg)
-            || HasRaw(AceStepFunExtension.Text2AudioSteps);
+            || HasRaw(AceStepFunExtension.Text2AudioSteps)
+            || PromptParser.HasAudioSection(g.UserInput.Get(T2IParamTypes.Prompt, ""));
     }
 
     private bool HasRaw<T>(T2IRegisteredParam<T> param)

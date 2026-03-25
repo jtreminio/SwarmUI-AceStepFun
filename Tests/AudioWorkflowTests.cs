@@ -117,6 +117,108 @@ public class AudioWorkflowTests
     }
 
     [Fact]
+    public void ResolvePrompt_UsesAudioSectionFromMainPrompt_WhenExplicitPromptsUnset()
+    {
+        EnsureParamsRegistered();
+        EnsureAudioPromptRegistration();
+
+        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input);
+        input.Set(T2IParamTypes.Prompt, "scene setup <audio>chorus lyrics");
+        input.PreparsePromptLikes();
+
+        Assert.Equal("chorus lyrics", InvokeResolvePrompt(audioWorkflow));
+    }
+
+    [Fact]
+    public void ResolvePrompt_FallsBackToMainPrompt_WhenAudioSectionMissing()
+    {
+        EnsureParamsRegistered();
+
+        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input);
+        input.Set(T2IParamTypes.Prompt, "plain main prompt");
+        input.PreparsePromptLikes();
+
+        Assert.Equal("plain main prompt", InvokeResolvePrompt(audioWorkflow));
+    }
+
+    [Fact]
+    public void ResolvePrompt_PrefersExplicitPromptParams_OverMainPromptAudioSection()
+    {
+        EnsureParamsRegistered();
+        EnsureAudioPromptRegistration();
+
+        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input);
+        input.Set(T2IParamTypes.Prompt, "global setup <audio>section prompt");
+        input.Set(AceStepFunExtension.Text2AudioPrompt, "fallback prompt");
+        input.PreparsePromptLikes();
+
+        Assert.Equal("fallback prompt", InvokeResolvePrompt(audioWorkflow));
+
+        input.Set(AceStepFunExtension.Prompt, "primary prompt");
+        Assert.Equal("primary prompt", InvokeResolvePrompt(audioWorkflow));
+    }
+
+    [Fact]
+    public void ResolvePrompt_FallsBackToMainPrompt_WhenExplicitPromptParamsAreRawButEmpty()
+    {
+        EnsureParamsRegistered();
+        EnsureAudioPromptRegistration();
+
+        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input);
+        input.Set(T2IParamTypes.Prompt, "global setup <audio>section prompt");
+        input.Set(AceStepFunExtension.Prompt, "");
+        input.Set(AceStepFunExtension.Text2AudioPrompt, "");
+        input.PreparsePromptLikes();
+
+        Assert.Equal("section prompt", InvokeResolvePrompt(audioWorkflow));
+    }
+
+    [Fact]
+    public void PreparsePromptLikes_RewritesAudioTagWithAceStepSectionId()
+    {
+        EnsureParamsRegistered();
+        EnsureAudioPromptRegistration();
+
+        T2IParamInput input = new(null);
+        input.Set(T2IParamTypes.Prompt, "global <audio>chorus lyrics");
+        input.PreparsePromptLikes();
+
+        string parsedPrompt = input.Get(T2IParamTypes.Prompt, "");
+        Assert.Contains($"<audio//cid={AceStepFunExtension.SectionID_Audio}>", parsedPrompt);
+    }
+
+    [Fact]
+    public void OnPreInit_RegistersFrontendAudioScript()
+    {
+        AceStepFunExtension extension = new();
+
+        extension.OnPreInit();
+
+        Assert.Contains("Assets/acestepfun.js", extension.ScriptFiles);
+    }
+
+    [Fact]
+    public void IsExtensionActive_IsTrue_ForAceStepMainModelWithAudioSectionOnly()
+    {
+        EnsureParamsRegistered();
+        EnsureAudioPromptRegistration();
+
+        T2IParamInput input = new(null);
+        input.Set(T2IParamTypes.Model, FakeAceStepModel());
+        input.Set(T2IParamTypes.Prompt, "global setup <audio>section prompt");
+        input.PreparsePromptLikes();
+
+        WorkflowGenerator generator = new()
+        {
+            UserInput = input,
+            Workflow = new JObject()
+        };
+
+        Runner runner = new(generator);
+        Assert.True(InvokeIsExtensionActive(runner));
+    }
+
+    [Fact]
     public void TryPatchExistingText2AudioGraph_DoesNotThrow_WhenAuraNodeMustBeInserted()
     {
         WorkflowGenerator generator = new()
@@ -126,9 +228,9 @@ public class AudioWorkflowTests
         };
 
         Type audioWorkflowType = typeof(AceStepFunExtension).Assembly.GetType("AceStepFun.AudioWorkflow")
-            ?? throw new InvalidOperationException("Could not find Ace2Video.AudioWorkflow.");
+            ?? throw new InvalidOperationException("Could not find AceStepFun.AudioWorkflow.");
         object audioWorkflow = Activator.CreateInstance(audioWorkflowType, generator)
-            ?? throw new InvalidOperationException("Could not create Ace2Video.AudioWorkflow.");
+            ?? throw new InvalidOperationException("Could not create AceStepFun.AudioWorkflow.");
 
         bool patched = InvokeTryPatchExistingText2AudioGraph(audioWorkflow);
 
@@ -199,6 +301,30 @@ public class AudioWorkflowTests
         }
     }
 
+    private static bool InvokeIsExtensionActive(Runner runner)
+    {
+        MethodInfo isExtensionActive = typeof(Runner).GetMethod("IsExtensionActive", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Could not find Runner.IsExtensionActive.");
+        object result = isExtensionActive.Invoke(runner, []);
+        return Assert.IsType<bool>(result);
+    }
+
+    private static string InvokeResolvePrompt(object audioWorkflow)
+    {
+        MethodInfo resolvePrompt = audioWorkflow.GetType().GetMethod("ResolvePrompt", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Could not find ResolvePrompt.");
+        try
+        {
+            object result = resolvePrompt.Invoke(audioWorkflow, []);
+            return Assert.IsType<string>(result);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+    }
+
     private static object CreateAudioWorkflow(out T2IParamInput input)
     {
         input = new T2IParamInput(null);
@@ -230,6 +356,14 @@ public class AudioWorkflowTests
         }
     }
 
+    private static void EnsureAudioPromptRegistration()
+    {
+        MethodInfo onPreInit = typeof(AceStepFunExtension).GetMethod("OnPreInit", BindingFlags.Instance | BindingFlags.Public)
+            ?? throw new InvalidOperationException("Could not find AceStepFunExtension.OnPreInit.");
+        AceStepFunExtension extension = new();
+        onPreInit.Invoke(extension, []);
+    }
+
     private static void EnsureParamsRegistered()
     {
         if (T2IParamTypes.Prompt is null)
@@ -243,6 +377,19 @@ public class AudioWorkflowTests
         MethodInfo registerParameters = typeof(AceStepFunExtension).GetMethod("RegisterParameters", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("Could not find AceStepFunExtension.RegisterParameters.");
         registerParameters.Invoke(null, []);
+    }
+
+    private static T2IModel FakeAceStepModel()
+    {
+        return new T2IModel(null, "", "", "unit-test-ace-step")
+        {
+            ModelClass = new T2IModelClass
+            {
+                ID = "test-ace-step-1_5",
+                Name = "unit-test-ace-step",
+                CompatClass = T2IModelClassSorter.CompatAceStep15
+            }
+        };
     }
 
     private static JObject BuildPatchableWorkflow()

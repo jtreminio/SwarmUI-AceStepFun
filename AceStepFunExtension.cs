@@ -34,6 +34,19 @@ public class AceStepFunExtension : Extension
         "AceStep/qwen_4b_ace15.safetensors"
     ];
 
+    public override void OnPreInit()
+    {
+        ScriptFiles.Add("Assets/acestepfun.js");
+        PromptRegion.RegisterCustomPrefix("audio");
+
+        T2IPromptHandling.PromptTagBasicProcessors["audio"] = (data, context) =>
+        {
+            context.SectionID = SectionID_Audio;
+            return $"<audio//cid={SectionID_Audio}>";
+        };
+        T2IPromptHandling.PromptTagLengthEstimators["audio"] = (data, context) => "<break>";
+    }
+
     public override void OnInit()
     {
         Logs.Info("AceStepFun Extension initializing...");

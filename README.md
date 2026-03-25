@@ -2,6 +2,20 @@
 
 More advanced AceStep 1.5 text-to-audio support for SwarmUI.
 
+## Audio Prompt Section
+
+`<audio>` is the recommended way to provide the audio-only prompt for AceStepFun.
+
+Examples:
+
+- `a cinematic music video intro <audio>anthemic pop chorus with bright female vocals`
+- `moody synthwave scene <audio>slow melancholic lyrics about neon rain`
+
+Behavior:
+
+- Text inside `<audio>...` is used as the AceStepFun audio-only prompt / lyrics section.
+- If no `<audio>` section is present, AceStepFun falls back to the normal main prompt.
+
 This extension supports:
 
 - Audio CFG

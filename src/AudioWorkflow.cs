@@ -49,11 +49,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
         (string clip2Name, string clip2Url, string clip2Hash) = GetClipInfo(clip2Selection);
         long seed = g.UserInput.Get(T2IParamTypes.Seed, 0);
         Params = new(
-            Prompt: GetUserParam(
-                AceStepFunExtension.Prompt,
-                AceStepFunExtension.Text2AudioPrompt,
-                ""
-            ).Trim(),
+            Prompt: ResolvePrompt(),
             Clip1: helpers.RequireClipModel(clip1Name, clip1Url, clip1Hash, null),
             Clip2: helpers.RequireClipModel(clip2Name, clip2Url, clip2Hash, null),
             Style: GetUserParam(
@@ -521,6 +517,11 @@ internal class AudioWorkflow(WorkflowGenerator g)
         }
         return TryGetInputSourceId(sourceInputs, "conditioning", out string conditioningNodeId)
             && aceEncodeNodeIds.Contains(conditioningNodeId);
+    }
+
+    private string ResolvePrompt()
+    {
+        return PromptParser.ResolvePrompt(g.UserInput);
     }
 
     private static bool IsInputFromNodeSet(JObject inputs, string inputName, HashSet<string> nodeIds)
