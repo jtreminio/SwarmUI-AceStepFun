@@ -142,43 +142,19 @@ internal class AudioWorkflow(WorkflowGenerator g)
         JArray vaeNode = g.LoadingVAE;
         g.LoadingVAE = previousVae;
 
-        string positivePromptNode = g.CreateNode(NodeTypes.TextEncodeAceStepAudio, new JObject
+        JObject positivePromptInputs = new()
         {
-            ["clip"] = new JArray(clipNode, 0),
-            ["lyrics"] = Params.Prompt,
-            ["tags"] = Params.Style,
-            ["seed"] = Params.ConditioningSeed,
-            ["bpm"] = Params.Bpm,
-            ["duration"] = Params.Duration,
-            ["timesignature"] = Params.TimeSignature,
-            ["language"] = Params.Language,
-            ["keyscale"] = Params.KeyScale,
-            ["generate_audio_codes"] = true,
-            ["cfg_scale"] = Params.AudioCfgScale,
-            ["temperature"] = 0.85,
-            ["top_p"] = 0.9,
-            ["top_k"] = 0,
-            ["min_p"] = 0
-        }, g.GetStableDynamicID(AudioIdBase + 30, 0));
+            ["clip"] = new JArray(clipNode, 0)
+        };
+        ApplyPromptInputs(positivePromptInputs);
+        string positivePromptNode = g.CreateNode(NodeTypes.TextEncodeAceStepAudio, positivePromptInputs, g.GetStableDynamicID(AudioIdBase + 30, 0));
 
-        string negativePromptNode = g.CreateNode(NodeTypes.TextEncodeAceStepAudio, new JObject
+        JObject negativePromptInputs = new()
         {
-            ["clip"] = new JArray(clipNode, 0),
-            ["lyrics"] = "",
-            ["tags"] = "",
-            ["seed"] = Params.ConditioningSeed,
-            ["bpm"] = Params.Bpm,
-            ["duration"] = Params.Duration,
-            ["timesignature"] = Params.TimeSignature,
-            ["language"] = Params.Language,
-            ["keyscale"] = Params.KeyScale,
-            ["generate_audio_codes"] = true,
-            ["cfg_scale"] = Params.AudioCfgScale,
-            ["temperature"] = 0.85,
-            ["top_p"] = 0.9,
-            ["top_k"] = 0,
-            ["min_p"] = 0
-        }, g.GetStableDynamicID(AudioIdBase + 35, 0));
+            ["clip"] = new JArray(clipNode, 0)
+        };
+        ApplyPromptInputs(negativePromptInputs);
+        string negativePromptNode = g.CreateNode(NodeTypes.TextEncodeAceStepAudio, negativePromptInputs, g.GetStableDynamicID(AudioIdBase + 35, 0));
 
         string latentNode = g.CreateNode(NodeTypes.EmptyAceStepAudioLatent, new JObject
         {
@@ -252,27 +228,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
                     referencedClipNodeIds.Add($"{normalizedClipPath[0]}");
                 }
                 aceEncodeNodeIds.Add(prop.Name);
-                bool isNegative = string.IsNullOrWhiteSpace($"{encodeInputs["lyrics"]}")
-                    && string.IsNullOrWhiteSpace($"{encodeInputs["tags"]}");
-                encodeInputs["seed"] = Params.ConditioningSeed;
-                encodeInputs["bpm"] = Params.Bpm;
-                encodeInputs["duration"] = Params.Duration;
-                encodeInputs["timesignature"] = Params.TimeSignature;
-                encodeInputs["language"] = Params.Language;
-                encodeInputs["keyscale"] = Params.KeyScale;
-                encodeInputs["generate_audio_codes"] = true;
-                encodeInputs["cfg_scale"] = Params.AudioCfgScale;
-                encodeInputs["temperature"] = 0.85;
-                encodeInputs["top_p"] = 0.9;
-                encodeInputs["top_k"] = 0;
-                encodeInputs["min_p"] = 0;
-                encodeInputs["lyrics"] = "";
-                encodeInputs["tags"] = "";
-                if (!isNegative)
-                {
-                    encodeInputs["lyrics"] = Params.Prompt;
-                    encodeInputs["tags"] = Params.Style;
-                }
+                ApplyPromptInputs(encodeInputs);
                 encodeNodeCount++;
             }
             else if (classType == NodeTypes.EmptyAceStepAudioLatent
@@ -372,6 +328,24 @@ internal class AudioWorkflow(WorkflowGenerator g)
             }
         }
         return false;
+    }
+
+    private void ApplyPromptInputs(JObject encodeInputs)
+    {
+        encodeInputs["lyrics"] = Params.Prompt;
+        encodeInputs["tags"] = Params.Style;
+        encodeInputs["seed"] = Params.ConditioningSeed;
+        encodeInputs["bpm"] = Params.Bpm;
+        encodeInputs["duration"] = Params.Duration;
+        encodeInputs["timesignature"] = Params.TimeSignature;
+        encodeInputs["language"] = Params.Language;
+        encodeInputs["keyscale"] = Params.KeyScale;
+        encodeInputs["generate_audio_codes"] = true;
+        encodeInputs["cfg_scale"] = Params.AudioCfgScale;
+        encodeInputs["temperature"] = 0.85;
+        encodeInputs["top_p"] = 0.9;
+        encodeInputs["top_k"] = 0;
+        encodeInputs["min_p"] = 0;
     }
 
     private JArray ApplyConfiguredLorasToSamplerModel(JArray modelPath)

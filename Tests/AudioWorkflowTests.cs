@@ -349,6 +349,12 @@ public class AudioWorkflowTests
         JArray negativePath = Assert.IsType<JArray>(samplerInputs["negative"]);
         JObject zeroedNegativeNode = Assert.IsType<JObject>(generator.Workflow[$"{negativePath[0]}"]);
         Assert.Equal("ConditioningZeroOut", $"{zeroedNegativeNode["class_type"]}");
+        JObject zeroedNegativeInputs = Assert.IsType<JObject>(zeroedNegativeNode["inputs"]);
+        JArray zeroedConditioningPath = Assert.IsType<JArray>(zeroedNegativeInputs["conditioning"]);
+        JObject negativeEncodeNode = Assert.IsType<JObject>(generator.Workflow[$"{zeroedConditioningPath[0]}"]);
+        JObject negativeEncodeInputs = Assert.IsType<JObject>(negativeEncodeNode["inputs"]);
+        Assert.Equal("patched lyrics", $"{negativeEncodeInputs["lyrics"]}");
+        Assert.Equal("patched tags", $"{negativeEncodeInputs["tags"]}");
 
         JObject positiveEncodeNode = Assert.IsType<JObject>(generator.Workflow["2"]);
         JObject positiveEncodeInputs = Assert.IsType<JObject>(positiveEncodeNode["inputs"]);
