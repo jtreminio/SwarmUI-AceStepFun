@@ -14,7 +14,7 @@ public class AceStepFunExtension : Extension
     public static T2IRegisteredParam<string> Prompt;
     public static T2IRegisteredParam<string> Style;
     public static T2IRegisteredParam<double> AudioCfg;
-    public static T2IRegisteredParam<double> SamplerCfg;
+    public static T2IRegisteredParam<double> LmCfg;
     public static T2IRegisteredParam<long> Steps;
     public static T2IRegisteredParam<string> LmModel;
     public static T2IRegisteredParam<double> Duration;
@@ -25,7 +25,7 @@ public class AceStepFunExtension : Extension
     public static T2IRegisteredParam<string> Text2AudioPrompt;
     public static T2IRegisteredParam<string> Text2AudioLmModel;
     public static T2IRegisteredParam<double> Text2AudioAudioCfg;
-    public static T2IRegisteredParam<double> Text2AudioSamplerCfg;
+    public static T2IRegisteredParam<double> Text2AudioLmCfg;
     public static T2IRegisteredParam<long> Text2AudioSteps;
     public static T2IRegisteredParam<double> Text2AudioSigmaShift;
     private static readonly List<string> LmModelOptions =
@@ -188,19 +188,20 @@ public class AceStepFunExtension : Extension
         ));
         OrderPriority += 1;
 
-        SamplerCfg = T2IParamTypes.Register<double>(new T2IParamType(
-            Name: "AceStepFun Sampler CFG",
-            Description: "Sampler CFG.",
+        LmCfg = T2IParamTypes.Register<double>(new T2IParamType(
+            Name: "AceStepFun LM CFG",
+            Description: "LM CFG.",
             Default: "2",
             Min: 1,
             Max: 10,
             Step: 0.5,
-            ViewType: ParamViewType.SLIDER,
             Group: AceStepFunGroup,
-            OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            VisibleNormally: false,
+            ExtraHidden: true,
             DoNotPreview: true
         ));
+        T2IParamTypes.ParameterRemaps[T2IParamTypes.CleanTypeName("AceStepFun Sampler CFG")] = LmCfg.Type.ID;
         OrderPriority += 1;
 
         Steps = T2IParamTypes.Register<long>(new T2IParamType(
@@ -254,22 +255,7 @@ public class AceStepFunExtension : Extension
 
         Text2AudioAudioCfg = T2IParamTypes.Register<double>(new T2IParamType(
             Name: "Text2Audio Audio CFG",
-            Description: "Audio CFG for text2audio generation.",
-            Default: "1",
-            Min: 1,
-            Max: 10,
-            Step: 0.5,
-            ViewType: ParamViewType.SLIDER,
-            Group: AceStepFunGroup,
-            FeatureFlag: "text2audio",
-            VisibleNormally: false,
-            ExtraHidden: true,
-            DoNotPreview: true
-        ));
-
-        Text2AudioSamplerCfg = T2IParamTypes.Register<double>(new T2IParamType(
-            Name: "Text2Audio Sampler CFG",
-            Description: "Sampler CFG for text2audio generation.",
+            Description: "Audio sampler CFG for text2audio generation.",
             Default: "2",
             Min: 1,
             Max: 10,
@@ -281,6 +267,21 @@ public class AceStepFunExtension : Extension
             ExtraHidden: true,
             DoNotPreview: true
         ));
+
+        Text2AudioLmCfg = T2IParamTypes.Register<double>(new T2IParamType(
+            Name: "Text2Audio LM CFG",
+            Description: "LM CFG for text2audio generation.",
+            Default: "2",
+            Min: 1,
+            Max: 10,
+            Step: 0.5,
+            Group: AceStepFunGroup,
+            FeatureFlag: "text2audio",
+            VisibleNormally: false,
+            ExtraHidden: true,
+            DoNotPreview: true
+        ));
+        T2IParamTypes.ParameterRemaps[T2IParamTypes.CleanTypeName("Text2Audio Sampler CFG")] = Text2AudioLmCfg.Type.ID;
 
         Text2AudioSteps = T2IParamTypes.Register<long>(new T2IParamType(
             Name: "Text2Audio Steps",

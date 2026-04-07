@@ -18,8 +18,8 @@ internal class AudioWorkflow(WorkflowGenerator g)
         string TimeSignature,
         string Language,
         string KeyScale,
-        double AudioCfgScale,
-        double SamplerCfg,
+        double LmCfgScale,
+        double AudioCfg,
         int Steps,
         string AudioSamplerName = "euler",
         string AudioScheduler = "simple",
@@ -48,8 +48,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
         WorkflowGenerator.ModelLoadHelpers helpers = new(g);
         string clip2Selection = GetUserParam(
             AceStepFunExtension.LmModel,
-            AceStepFunExtension.Text2AudioLmModel,
-            DefaultClip2
+            AceStepFunExtension.Text2AudioLmModel
         );
         (string clip1Name, string clip1Url, string clip1Hash) = GetClipInfo(DefaultClip1);
         (string clip2Name, string clip2Url, string clip2Hash) = GetClipInfo(clip2Selection);
@@ -60,50 +59,41 @@ internal class AudioWorkflow(WorkflowGenerator g)
             Clip2: helpers.RequireClipModel(clip2Name, clip2Url, clip2Hash, null),
             Style: GetUserParam(
                 AceStepFunExtension.Style,
-                T2IParamTypes.Text2AudioStyle,
-                ""
+                T2IParamTypes.Text2AudioStyle
             ),
             Seed: seed,
             ConditioningSeed: seed + 10,
             Duration: GetUserParam(
                 AceStepFunExtension.Duration,
-                T2IParamTypes.Text2AudioDuration,
-                120.0
+                T2IParamTypes.Text2AudioDuration
             ),
             Bpm: GetUserParam(
                 AceStepFunExtension.Bpm,
-                T2IParamTypes.Text2AudioBPM,
-                120L
+                T2IParamTypes.Text2AudioBPM
             ),
             TimeSignature: GetUserParam(
                 AceStepFunExtension.TimeSignature,
-                T2IParamTypes.Text2AudioTimeSignature,
-                "4"
+                T2IParamTypes.Text2AudioTimeSignature
             ),
             Language: GetUserParam(
                 AceStepFunExtension.Language,
-                T2IParamTypes.Text2AudioLanguage,
-                "en"
+                T2IParamTypes.Text2AudioLanguage
             ),
             KeyScale: GetUserParam(
                 AceStepFunExtension.KeyScale,
-                T2IParamTypes.Text2AudioKeyScale,
-                "E minor"
+                T2IParamTypes.Text2AudioKeyScale
             ),
-            AudioCfgScale: GetUserParam(
+            LmCfgScale: GetUserParam(
+                AceStepFunExtension.LmCfg,
+                AceStepFunExtension.Text2AudioLmCfg
+            ),
+            AudioCfg: GetUserParam(
                 AceStepFunExtension.AudioCfg,
-                AceStepFunExtension.Text2AudioAudioCfg,
-                2.0
-            ),
-            SamplerCfg: GetUserParam(
-                AceStepFunExtension.SamplerCfg,
-                AceStepFunExtension.Text2AudioSamplerCfg,
-                1.0
+                AceStepFunExtension.Text2AudioAudioCfg
             ),
             Steps: (int)GetUserParam(
                 AceStepFunExtension.Steps,
-                AceStepFunExtension.Text2AudioSteps,
-                20L
+                AceStepFunExtension.Text2AudioSteps
             ),
             SigmaShift: g.UserInput.Get(AceStepFunExtension.Text2AudioSigmaShift, 3.0)
         );
@@ -173,7 +163,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
             ["model"] = new JArray(samplingNode, 0),
             ["noise_seed"] = Params.Seed,
             ["steps"] = Params.Steps,
-            ["cfg"] = Params.SamplerCfg,
+            ["cfg"] = Params.AudioCfg,
             ["sampler_name"] = Params.AudioSamplerName,
             ["scheduler"] = Params.AudioScheduler,
             ["positive"] = new JArray(positivePromptNode, 0),
@@ -262,7 +252,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
                 continue;
             }
             samplerInputs["steps"] = Params.Steps;
-            samplerInputs["cfg"] = Params.SamplerCfg;
+            samplerInputs["cfg"] = Params.AudioCfg;
             samplerInputs["sampler_name"] = Params.AudioSamplerName;
             samplerInputs["scheduler"] = Params.AudioScheduler;
             JArray modelInput = GetInputPath(samplerInputs, "model");
@@ -342,7 +332,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
         encodeInputs["language"] = Params.Language;
         encodeInputs["keyscale"] = Params.KeyScale;
         encodeInputs["generate_audio_codes"] = true;
-        encodeInputs["cfg_scale"] = Params.AudioCfgScale;
+        encodeInputs["cfg_scale"] = Params.LmCfgScale;
         encodeInputs["temperature"] = 0.85;
         encodeInputs["top_p"] = 0.9;
         encodeInputs["top_k"] = 0;
@@ -721,8 +711,9 @@ internal class AudioWorkflow(WorkflowGenerator g)
         return !string.IsNullOrWhiteSpace(sourceNodeId);
     }
 
-    private T GetUserParam<T>(T2IRegisteredParam<T> primary, T2IRegisteredParam<T> fallback, T defaultValue)
+    private T GetUserParam<T>(T2IRegisteredParam<T> primary, T2IRegisteredParam<T> fallback)
     {
+        T defaultValue = GetParamDefault(primary);
         bool hasPrimary = HasRaw(primary);
         bool hasFallback = HasRaw(fallback);
         T primaryValue = hasPrimary ? g.UserInput.Get(primary, defaultValue) : defaultValue;
@@ -746,6 +737,18 @@ internal class AudioWorkflow(WorkflowGenerator g)
             return primaryValue;
         }
         return g.UserInput.Get(primary, defaultValue);
+    }
+
+    private static T GetParamDefault<T>(T2IRegisteredParam<T> param)
+    {
+        if (param?.Type is null)
+        {
+            return default;
+        }
+
+        T2IParamSet defaultSet = new();
+        defaultSet.Set(param.Type, param.Type.Default ?? "");
+        return defaultSet.Get(param);
     }
 
     private bool HasRaw<T>(T2IRegisteredParam<T> param)

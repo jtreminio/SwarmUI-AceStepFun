@@ -27,24 +27,24 @@ public class AudioWorkflowTests
         input.Set(T2IParamTypes.Text2AudioKeyScale, "C major");
         input.Set(AceStepFunExtension.Text2AudioLmModel, "AceStep/qwen_4b_ace15.safetensors");
         input.Set(AceStepFunExtension.Text2AudioAudioCfg, 4.5);
-        input.Set(AceStepFunExtension.Text2AudioSamplerCfg, 3.5);
+        input.Set(AceStepFunExtension.Text2AudioLmCfg, 3.5);
         input.Set(AceStepFunExtension.Text2AudioSteps, 33L);
 
-        Assert.Equal("fallback prompt", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt, ""));
-        Assert.Equal("fallback style", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle, ""));
-        Assert.Equal(77.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration, 120.0));
-        Assert.Equal(141L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM, 120L));
-        Assert.Equal("6", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature, "4"));
-        Assert.Equal("ja", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage, "en"));
-        Assert.Equal("C major", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale, "E minor"));
-        Assert.Equal("AceStep/qwen_4b_ace15.safetensors", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel, "AceStep/qwen_1.7b_ace15.safetensors"));
-        Assert.Equal(4.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg, 2.0));
-        Assert.Equal(3.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.SamplerCfg, AceStepFunExtension.Text2AudioSamplerCfg, 1.0));
-        Assert.Equal(33L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps, 20L));
+        Assert.Equal("fallback prompt", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt));
+        Assert.Equal("fallback style", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle));
+        Assert.Equal(77.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration));
+        Assert.Equal(141L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM));
+        Assert.Equal("6", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature));
+        Assert.Equal("ja", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage));
+        Assert.Equal("C major", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale));
+        Assert.Equal("AceStep/qwen_4b_ace15.safetensors", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel));
+        Assert.Equal(3.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmCfg, AceStepFunExtension.Text2AudioLmCfg));
+        Assert.Equal(4.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg));
+        Assert.Equal(33L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps));
     }
 
     [Fact]
-    public void GetUserParam_PrefersAceStepFunPrimary_AndUsesFallbackWhenPrimaryEqualsDefault()
+    public void GetUserParam_PrefersAceStepFunPrimary_AndUsesFallbackWhenPrimaryEqualsRegisteredDefault()
     {
         EnsureParamsRegistered();
 
@@ -52,69 +52,89 @@ public class AudioWorkflowTests
 
         input.Set(AceStepFunExtension.Prompt, "primary prompt");
         input.Set(AceStepFunExtension.Text2AudioPrompt, "fallback prompt");
-        Assert.Equal("primary prompt", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt, ""));
+        Assert.Equal("primary prompt", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt));
         input.Set(AceStepFunExtension.Prompt, "");
-        Assert.Equal("fallback prompt", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt, ""));
+        Assert.Equal("fallback prompt", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt));
 
         input.Set(AceStepFunExtension.Style, "primary style");
         input.Set(T2IParamTypes.Text2AudioStyle, "fallback style");
-        Assert.Equal("primary style", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle, ""));
+        Assert.Equal("primary style", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle));
         input.Set(AceStepFunExtension.Style, "");
-        Assert.Equal("fallback style", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle, ""));
+        Assert.Equal("fallback style", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle));
 
         input.Set(AceStepFunExtension.Duration, 42.0);
         input.Set(T2IParamTypes.Text2AudioDuration, 77.0);
-        Assert.Equal(42.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration, 120.0));
+        Assert.Equal(42.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration));
         input.Set(AceStepFunExtension.Duration, 120.0);
-        Assert.Equal(77.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration, 120.0));
+        Assert.Equal(77.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration));
 
         input.Set(AceStepFunExtension.Bpm, 150L);
         input.Set(T2IParamTypes.Text2AudioBPM, 141L);
-        Assert.Equal(150L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM, 120L));
+        Assert.Equal(150L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM));
         input.Set(AceStepFunExtension.Bpm, 120L);
-        Assert.Equal(141L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM, 120L));
+        Assert.Equal(141L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM));
 
         input.Set(AceStepFunExtension.TimeSignature, "3");
         input.Set(T2IParamTypes.Text2AudioTimeSignature, "6");
-        Assert.Equal("3", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature, "4"));
+        Assert.Equal("3", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature));
         input.Set(AceStepFunExtension.TimeSignature, "4");
-        Assert.Equal("6", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature, "4"));
+        Assert.Equal("6", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature));
 
         input.Set(AceStepFunExtension.Language, "de");
         input.Set(T2IParamTypes.Text2AudioLanguage, "ja");
-        Assert.Equal("de", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage, "en"));
+        Assert.Equal("de", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage));
         input.Set(AceStepFunExtension.Language, "en");
-        Assert.Equal("ja", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage, "en"));
+        Assert.Equal("ja", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage));
 
         input.Set(AceStepFunExtension.KeyScale, "A minor");
         input.Set(T2IParamTypes.Text2AudioKeyScale, "C major");
-        Assert.Equal("A minor", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale, "E minor"));
+        Assert.Equal("A minor", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale));
         input.Set(AceStepFunExtension.KeyScale, "E minor");
-        Assert.Equal("C major", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale, "E minor"));
+        Assert.Equal("C major", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale));
 
         input.Set(AceStepFunExtension.LmModel, "AceStep/qwen_0.6b_ace15.safetensors");
         input.Set(AceStepFunExtension.Text2AudioLmModel, "AceStep/qwen_4b_ace15.safetensors");
-        Assert.Equal("AceStep/qwen_0.6b_ace15.safetensors", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel, "AceStep/qwen_1.7b_ace15.safetensors"));
+        Assert.Equal("AceStep/qwen_0.6b_ace15.safetensors", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel));
         input.Set(AceStepFunExtension.LmModel, "AceStep/qwen_1.7b_ace15.safetensors");
-        Assert.Equal("AceStep/qwen_4b_ace15.safetensors", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel, "AceStep/qwen_1.7b_ace15.safetensors"));
+        Assert.Equal("AceStep/qwen_4b_ace15.safetensors", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel));
 
-        input.Set(AceStepFunExtension.AudioCfg, 4.0);
-        input.Set(AceStepFunExtension.Text2AudioAudioCfg, 4.5);
-        Assert.Equal(4.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg, 2.0));
+        input.Set(AceStepFunExtension.LmCfg, 2.0);
+        input.Set(AceStepFunExtension.Text2AudioLmCfg, 4.5);
+        Assert.Equal(2.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmCfg, AceStepFunExtension.Text2AudioLmCfg));
+        input.Set(AceStepFunExtension.LmCfg, 1.0);
+        Assert.Equal(4.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmCfg, AceStepFunExtension.Text2AudioLmCfg));
+
+        input.Set(AceStepFunExtension.AudioCfg, 2.5);
+        input.Set(AceStepFunExtension.Text2AudioAudioCfg, 3.5);
+        Assert.Equal(2.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg));
         input.Set(AceStepFunExtension.AudioCfg, 2.0);
-        Assert.Equal(4.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg, 2.0));
-
-        input.Set(AceStepFunExtension.SamplerCfg, 2.5);
-        input.Set(AceStepFunExtension.Text2AudioSamplerCfg, 3.5);
-        Assert.Equal(2.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.SamplerCfg, AceStepFunExtension.Text2AudioSamplerCfg, 1.0));
-        input.Set(AceStepFunExtension.SamplerCfg, 1.0);
-        Assert.Equal(3.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.SamplerCfg, AceStepFunExtension.Text2AudioSamplerCfg, 1.0));
+        Assert.Equal(3.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg));
 
         input.Set(AceStepFunExtension.Steps, 12L);
         input.Set(AceStepFunExtension.Text2AudioSteps, 33L);
-        Assert.Equal(12L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps, 20L));
-        input.Set(AceStepFunExtension.Steps, 20L);
-        Assert.Equal(33L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps, 20L));
+        Assert.Equal(12L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps));
+        input.Set(AceStepFunExtension.Steps, 8L);
+        Assert.Equal(33L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps));
+    }
+
+    [Fact]
+    public void Text2AudioLmCfg_AcceptsLegacyText2AudioSamplerCfgId()
+    {
+        EnsureParamsRegistered();
+
+        T2IParamInput input = new(null);
+        Assert.True(T2IParamTypes.TryGetType("textaudiosamplercfg", out T2IParamType type, input));
+        Assert.Equal(AceStepFunExtension.Text2AudioLmCfg.Type.ID, type.ID);
+    }
+
+    [Fact]
+    public void AceStepFunLmCfg_AcceptsLegacyAceStepFunSamplerCfgId()
+    {
+        EnsureParamsRegistered();
+
+        T2IParamInput input = new(null);
+        Assert.True(T2IParamTypes.TryGetType("acestepfunsamplercfg", out T2IParamType type, input));
+        Assert.Equal(AceStepFunExtension.LmCfg.Type.ID, type.ID);
     }
 
     [Fact]
@@ -385,7 +405,7 @@ public class AudioWorkflowTests
             "en",
             "E minor",
             2.0,
-            1.0,
+            2.0,
             8,
             "euler",
             "simple",
@@ -468,14 +488,14 @@ public class AudioWorkflowTests
             ?? throw new InvalidOperationException("Could not create AceStepFun.AudioWorkflow.");
     }
 
-    private static T InvokeGetUserParam<T>(object audioWorkflow, T2IRegisteredParam<T> primary, T2IRegisteredParam<T> fallback, T defaultValue)
+    private static T InvokeGetUserParam<T>(object audioWorkflow, T2IRegisteredParam<T> primary, T2IRegisteredParam<T> fallback)
     {
         MethodInfo getUserParam = audioWorkflow.GetType().GetMethod("GetUserParam", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("Could not find GetUserParam.");
         MethodInfo generic = getUserParam.MakeGenericMethod(typeof(T));
         try
         {
-            object result = generic.Invoke(audioWorkflow, [primary, fallback, defaultValue]);
+            object result = generic.Invoke(audioWorkflow, [primary, fallback]);
             return Assert.IsType<T>(result);
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
