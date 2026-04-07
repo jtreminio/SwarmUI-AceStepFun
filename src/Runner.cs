@@ -56,6 +56,7 @@ public class Runner(WorkflowGenerator g)
             || HasRaw(AceStepFunExtension.Text2AudioAudioCfg)
             || HasRaw(AceStepFunExtension.Text2AudioSamplerCfg)
             || HasRaw(AceStepFunExtension.Text2AudioSteps)
+            || HasRaw(AceStepFunExtension.Text2AudioSigmaShift)
             || AceStepLoraParser.HasRelevantLoras(g.UserInput)
             || PromptParser.HasAudioSection(g.UserInput.Get(T2IParamTypes.Prompt, ""));
     }

@@ -27,6 +27,7 @@ public class AceStepFunExtension : Extension
     public static T2IRegisteredParam<double> Text2AudioAudioCfg;
     public static T2IRegisteredParam<double> Text2AudioSamplerCfg;
     public static T2IRegisteredParam<long> Text2AudioSteps;
+    public static T2IRegisteredParam<double> Text2AudioSigmaShift;
     private static readonly List<string> LmModelOptions =
     [
         "AceStep/qwen_0.6b_ace15.safetensors",
@@ -289,6 +290,19 @@ public class AceStepFunExtension : Extension
             Max: 100,
             Step: 1,
             ViewType: ParamViewType.SLIDER,
+            Group: AceStepFunGroup,
+            FeatureFlag: "text2audio",
+            VisibleNormally: false,
+            ExtraHidden: true,
+            DoNotPreview: true
+        ));
+
+        Text2AudioSigmaShift = T2IParamTypes.Register<double>(new T2IParamType(
+            Name: "Text2Audio Sigma Shift",
+            Description: "",
+            Default: "3",
+            Min: 1,
+            Max: 100,
             Group: AceStepFunGroup,
             FeatureFlag: "text2audio",
             VisibleNormally: false,

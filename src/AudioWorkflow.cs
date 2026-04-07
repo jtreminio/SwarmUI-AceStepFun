@@ -23,7 +23,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
         int Steps,
         string AudioSamplerName = "euler",
         string AudioScheduler = "simple",
-        double AuraShift = 3
+        double SigmaShift = 3
     );
 
     private sealed record ExistingLoraChain(
@@ -104,7 +104,8 @@ internal class AudioWorkflow(WorkflowGenerator g)
                 AceStepFunExtension.Steps,
                 AceStepFunExtension.Text2AudioSteps,
                 20L
-            )
+            ),
+            SigmaShift: g.UserInput.Get(AceStepFunExtension.Text2AudioSigmaShift, 3.0)
         );
 
         bool mainModelIsAceStep = g.UserInput.TryGet(T2IParamTypes.Model, out T2IModel mainModel)
@@ -134,7 +135,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
         string samplingNode = g.CreateNode(NodeTypes.ModelSamplingAuraFlow, new JObject
         {
             ["model"] = modelPath,
-            ["shift"] = Params.AuraShift
+            ["shift"] = Params.SigmaShift
         }, g.GetStableDynamicID(AudioIdBase + 25, 0));
 
         JArray previousVae = g.LoadingVAE;
@@ -514,14 +515,14 @@ internal class AudioWorkflow(WorkflowGenerator g)
 
         if (TryGetAuraInputs(modelPath, out JObject auraInputs))
         {
-            auraInputs["shift"] = Params.AuraShift;
+            auraInputs["shift"] = Params.SigmaShift;
             return modelPath;
         }
 
         string auraNode = g.CreateNode(NodeTypes.ModelSamplingAuraFlow, new JObject
         {
             ["model"] = modelPath,
-            ["shift"] = Params.AuraShift
+            ["shift"] = Params.SigmaShift
         });
         return new JArray(auraNode, 0);
     }

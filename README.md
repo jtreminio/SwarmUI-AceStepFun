@@ -31,4 +31,4 @@ All extension parameters can be set in prompt params, for example:
 - `<param[acestepfun steps]:12>`
 - `<param[acestepfun lm model]:AceStep/qwen_4b_ace15.safetensors>`
 
-It also supports equivalent `text2audio*` params (for example `<param[text2audio style]:pop>`), with `acestepfun*` values taking priority when both are set.
+It also supports equivalent `text2audio*` params (for example `<param[text2audio style]:pop>` or `<param[text2audio sigma shift]:7>`), with `acestepfun*` values taking priority when both are set.
