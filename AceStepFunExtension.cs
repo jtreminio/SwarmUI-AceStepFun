@@ -209,7 +209,7 @@ public class AceStepFunExtension : Extension
             Description: "Sampling steps.",
             Default: "8",
             Min: 1,
-            Max: 100,
+            Max: 256,
             Step: 1,
             ViewType: ParamViewType.SLIDER,
             Group: AceStepFunGroup,
