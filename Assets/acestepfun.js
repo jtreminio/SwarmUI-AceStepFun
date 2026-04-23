@@ -24,4 +24,66 @@ class AceStepFunUI {
     }
 }
 
+class AceStepFunTrackPublisher {
+    constructor() {
+        this.eventName = "acestepfun:tracks-changed";
+        this.refPrefix = "acestepfun";
+        this.toggleId = "input_group_content_acestepfun_toggle";
+        this.lastSnapshotJson = "";
+        this.ensureRegistry();
+        this.publish();
+        this.startPolling();
+    }
+
+    isAceStepFunGroupEnabled() {
+        const toggler = document.getElementById(this.toggleId);
+        return !toggler || !!toggler.checked;
+    }
+
+    buildSnapshot() {
+        const enabled = this.isAceStepFunGroupEnabled();
+        const trackCount = enabled ? 1 : 0;
+        const refs = [];
+        for (let i = 0; i < trackCount; i++) {
+            refs.push(`${this.refPrefix}${i}`);
+        }
+        return { enabled, trackCount, refs };
+    }
+
+    cloneSnapshot(snapshot) {
+        return {
+            enabled: snapshot.enabled,
+            trackCount: snapshot.trackCount,
+            refs: [...snapshot.refs],
+        };
+    }
+
+    ensureRegistry() {
+        const getSnapshot = () => this.cloneSnapshot(this.buildSnapshot());
+        if (!window.acestepfunTrackRegistry) {
+            window.acestepfunTrackRegistry = { getSnapshot };
+            return;
+        }
+        window.acestepfunTrackRegistry.getSnapshot = getSnapshot;
+    }
+
+    publish() {
+        this.ensureRegistry();
+        const snapshot = this.cloneSnapshot(this.buildSnapshot());
+        this.lastSnapshotJson = JSON.stringify(snapshot);
+        document.dispatchEvent(new CustomEvent(this.eventName, { detail: snapshot }));
+    }
+
+    startPolling() {
+        setInterval(() => {
+            const currentJson = JSON.stringify(this.buildSnapshot());
+            if (currentJson === this.lastSnapshotJson) {
+                return;
+            }
+            this.publish();
+        }, 150);
+    }
+}
+
 new AceStepFunUI();
+new AceStepFunTrackPublisher();
