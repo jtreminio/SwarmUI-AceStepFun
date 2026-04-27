@@ -14,3 +14,8 @@ Properties/
 .local/
 **/Directory.Build.local.props
 __pycache__
+
+# Node / TypeScript
+node_modules/
+*.js.map
+coverage/

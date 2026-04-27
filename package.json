@@ -1,0 +1,21 @@
+{
+    "name": "swarmui-acestepfun-extension",
+    "version": "1.0.0",
+    "description": "AceStepFun extension for SwarmUI audio workflows",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "npm run lint && npm run check && node ./scripts/build.mjs",
+        "check": "npm run format:check && npm run typecheck",
+        "clean": "rm -f Assets/acestepfun.js Assets/acestepfun.js.map",
+        "format": "biome format --write .",
+        "format:check": "biome format .",
+        "lint": "biome check --write .",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.13",
+        "esbuild": "^0.28.0",
+        "typescript": "^6.0.3"
+    }
+}
