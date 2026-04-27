@@ -8,6 +8,8 @@ namespace AceStepFun;
 public class AceStepFunExtension : Extension
 {
     public const int SectionID_Audio = 55425;
+    public static int AudioSectionIdForTrack(int trackIndex) => SectionID_Audio + 1 + trackIndex;
+    public static int AceStepSectionIdForTrack(int trackIndex) => AudioSectionIdForTrack(trackIndex);
     private const string ComfyUIFeatureFlag = "comfyui";
 
     public static T2IRegisteredParam<T2IModel> Model;
@@ -22,6 +24,7 @@ public class AceStepFunExtension : Extension
     public static T2IRegisteredParam<string> TimeSignature;
     public static T2IRegisteredParam<string> Language;
     public static T2IRegisteredParam<string> KeyScale;
+    public static T2IRegisteredParam<string> MusicTracks;
     public static T2IRegisteredParam<string> Text2AudioPrompt;
     public static T2IRegisteredParam<string> Text2AudioLmModel;
     public static T2IRegisteredParam<double> Text2AudioAudioCfg;
@@ -38,13 +41,26 @@ public class AceStepFunExtension : Extension
     public override void OnPreInit()
     {
         ScriptFiles.Add("Assets/acestepfun.js");
+        PromptRegion.RegisterCustomPrefix("acestepfun");
         PromptRegion.RegisterCustomPrefix("audio");
+
+        T2IPromptHandling.PromptTagBasicProcessors["acestepfun"] = (data, context) =>
+        {
+            int sectionId = SectionID_Audio;
+            if (int.TryParse(context.PreData, out int trackIndex) && trackIndex >= 0)
+            {
+                sectionId = AceStepSectionIdForTrack(trackIndex);
+            }
+            context.SectionID = sectionId;
+            return $"<acestepfun//cid={sectionId}>";
+        };
 
         T2IPromptHandling.PromptTagBasicProcessors["audio"] = (data, context) =>
         {
             context.SectionID = SectionID_Audio;
             return $"<audio//cid={SectionID_Audio}>";
         };
+        T2IPromptHandling.PromptTagLengthEstimators["acestepfun"] = (data, context) => "<break>";
         T2IPromptHandling.PromptTagLengthEstimators["audio"] = (data, context) => "<break>";
     }
 
@@ -81,6 +97,7 @@ public class AceStepFunExtension : Extension
             FeatureFlag: ComfyUIFeatureFlag,
             Subtype: "Stable-Diffusion",
             ChangeWeight: 9,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -93,6 +110,7 @@ public class AceStepFunExtension : Extension
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -107,6 +125,7 @@ public class AceStepFunExtension : Extension
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -119,6 +138,7 @@ public class AceStepFunExtension : Extension
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -133,6 +153,7 @@ public class AceStepFunExtension : Extension
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -145,6 +166,7 @@ public class AceStepFunExtension : Extension
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -157,6 +179,7 @@ public class AceStepFunExtension : Extension
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -169,6 +192,7 @@ public class AceStepFunExtension : Extension
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -184,6 +208,7 @@ public class AceStepFunExtension : Extension
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -199,6 +224,7 @@ public class AceStepFunExtension : Extension
             FeatureFlag: ComfyUIFeatureFlag,
             VisibleNormally: false,
             ExtraHidden: true,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         T2IParamTypes.ParameterRemaps[T2IParamTypes.CleanTypeName("AceStepFun Sampler CFG")] = LmCfg.Type.ID;
@@ -215,6 +241,7 @@ public class AceStepFunExtension : Extension
             Group: AceStepFunGroup,
             OrderPriority: OrderPriority,
             FeatureFlag: ComfyUIFeatureFlag,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         OrderPriority += 1;
@@ -227,6 +254,7 @@ public class AceStepFunExtension : Extension
             FeatureFlag: ComfyUIFeatureFlag,
             ViewType: ParamViewType.BIG,
             VisibleNormally: false,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
 
@@ -238,6 +266,7 @@ public class AceStepFunExtension : Extension
             FeatureFlag: "text2audio",
             VisibleNormally: false,
             ExtraHidden: true,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
 
@@ -250,6 +279,7 @@ public class AceStepFunExtension : Extension
             FeatureFlag: "text2audio",
             VisibleNormally: false,
             ExtraHidden: true,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
 
@@ -265,6 +295,7 @@ public class AceStepFunExtension : Extension
             FeatureFlag: "text2audio",
             VisibleNormally: false,
             ExtraHidden: true,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
 
@@ -279,6 +310,7 @@ public class AceStepFunExtension : Extension
             FeatureFlag: "text2audio",
             VisibleNormally: false,
             ExtraHidden: true,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
         T2IParamTypes.ParameterRemaps[T2IParamTypes.CleanTypeName("Text2Audio Sampler CFG")] = Text2AudioLmCfg.Type.ID;
@@ -295,6 +327,7 @@ public class AceStepFunExtension : Extension
             FeatureFlag: "text2audio",
             VisibleNormally: false,
             ExtraHidden: true,
+            CanSectionalize: true,
             DoNotPreview: true
         ));
 
@@ -308,7 +341,20 @@ public class AceStepFunExtension : Extension
             FeatureFlag: "text2audio",
             VisibleNormally: false,
             ExtraHidden: true,
+            CanSectionalize: true,
             DoNotPreview: true
+        ));
+
+        MusicTracks = T2IParamTypes.Register<string>(new T2IParamType(
+            Name: "AceStepFun Music Tracks",
+            Description: "Additional music tracks.",
+            Default: "[]",
+            VisibleNormally: false,
+            IsAdvanced: true,
+            HideFromMetadata: true,
+            DoNotPreview: true,
+            Group: AceStepFunGroup,
+            FeatureFlag: ComfyUIFeatureFlag
         ));
     }
 }

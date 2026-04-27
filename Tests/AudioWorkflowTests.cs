@@ -1,6 +1,6 @@
+using System.Collections;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
-using AceStepFun;
 using Newtonsoft.Json.Linq;
 using SwarmUI.Core;
 using SwarmUI.Builtin_ComfyUIBackend;
@@ -16,7 +16,8 @@ public class AudioWorkflowTests
     {
         EnsureParamsRegistered();
 
-        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input);
+        T2IParamInput input = new(null);
+        object jsonParser = CreateJsonParser(input);
 
         input.Set(AceStepFunExtension.Text2AudioPrompt, "fallback prompt");
         input.Set(T2IParamTypes.Text2AudioStyle, "fallback style");
@@ -30,17 +31,17 @@ public class AudioWorkflowTests
         input.Set(AceStepFunExtension.Text2AudioLmCfg, 3.5);
         input.Set(AceStepFunExtension.Text2AudioSteps, 33L);
 
-        Assert.Equal("fallback prompt", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt));
-        Assert.Equal("fallback style", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle));
-        Assert.Equal(77.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration));
-        Assert.Equal(141L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM));
-        Assert.Equal("6", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature));
-        Assert.Equal("ja", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage));
-        Assert.Equal("C major", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale));
-        Assert.Equal("AceStep/qwen_4b_ace15.safetensors", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel));
-        Assert.Equal(3.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmCfg, AceStepFunExtension.Text2AudioLmCfg));
-        Assert.Equal(4.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg));
-        Assert.Equal(33L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps));
+        Assert.Equal("fallback prompt", InvokeGetUserParam(jsonParser, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt));
+        Assert.Equal("fallback style", InvokeGetUserParam(jsonParser, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle));
+        Assert.Equal(77.0, InvokeGetUserParam(jsonParser, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration));
+        Assert.Equal(141L, InvokeGetUserParam(jsonParser, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM));
+        Assert.Equal("6", InvokeGetUserParam(jsonParser, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature));
+        Assert.Equal("ja", InvokeGetUserParam(jsonParser, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage));
+        Assert.Equal("C major", InvokeGetUserParam(jsonParser, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale));
+        Assert.Equal("AceStep/qwen_4b_ace15.safetensors", InvokeGetUserParam(jsonParser, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel));
+        Assert.Equal(3.5, InvokeGetUserParam(jsonParser, AceStepFunExtension.LmCfg, AceStepFunExtension.Text2AudioLmCfg));
+        Assert.Equal(4.5, InvokeGetUserParam(jsonParser, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg));
+        Assert.Equal(33L, InvokeGetUserParam(jsonParser, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps));
     }
 
     [Fact]
@@ -48,73 +49,74 @@ public class AudioWorkflowTests
     {
         EnsureParamsRegistered();
 
-        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input);
+        T2IParamInput input = new(null);
+        object jsonParser = CreateJsonParser(input);
 
         input.Set(AceStepFunExtension.Prompt, "primary prompt");
         input.Set(AceStepFunExtension.Text2AudioPrompt, "fallback prompt");
-        Assert.Equal("primary prompt", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt));
+        Assert.Equal("primary prompt", InvokeGetUserParam(jsonParser, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt));
         input.Set(AceStepFunExtension.Prompt, "");
-        Assert.Equal("fallback prompt", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt));
+        Assert.Equal("fallback prompt", InvokeGetUserParam(jsonParser, AceStepFunExtension.Prompt, AceStepFunExtension.Text2AudioPrompt));
 
         input.Set(AceStepFunExtension.Style, "primary style");
         input.Set(T2IParamTypes.Text2AudioStyle, "fallback style");
-        Assert.Equal("primary style", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle));
+        Assert.Equal("primary style", InvokeGetUserParam(jsonParser, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle));
         input.Set(AceStepFunExtension.Style, "");
-        Assert.Equal("fallback style", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle));
+        Assert.Equal("fallback style", InvokeGetUserParam(jsonParser, AceStepFunExtension.Style, T2IParamTypes.Text2AudioStyle));
 
         input.Set(AceStepFunExtension.Duration, 42.0);
         input.Set(T2IParamTypes.Text2AudioDuration, 77.0);
-        Assert.Equal(42.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration));
+        Assert.Equal(42.0, InvokeGetUserParam(jsonParser, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration));
         input.Set(AceStepFunExtension.Duration, 120.0);
-        Assert.Equal(77.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration));
+        Assert.Equal(77.0, InvokeGetUserParam(jsonParser, AceStepFunExtension.Duration, T2IParamTypes.Text2AudioDuration));
 
         input.Set(AceStepFunExtension.Bpm, 150L);
         input.Set(T2IParamTypes.Text2AudioBPM, 141L);
-        Assert.Equal(150L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM));
+        Assert.Equal(150L, InvokeGetUserParam(jsonParser, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM));
         input.Set(AceStepFunExtension.Bpm, 120L);
-        Assert.Equal(141L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM));
+        Assert.Equal(141L, InvokeGetUserParam(jsonParser, AceStepFunExtension.Bpm, T2IParamTypes.Text2AudioBPM));
 
         input.Set(AceStepFunExtension.TimeSignature, "3");
         input.Set(T2IParamTypes.Text2AudioTimeSignature, "6");
-        Assert.Equal("3", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature));
+        Assert.Equal("3", InvokeGetUserParam(jsonParser, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature));
         input.Set(AceStepFunExtension.TimeSignature, "4");
-        Assert.Equal("6", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature));
+        Assert.Equal("6", InvokeGetUserParam(jsonParser, AceStepFunExtension.TimeSignature, T2IParamTypes.Text2AudioTimeSignature));
 
         input.Set(AceStepFunExtension.Language, "de");
         input.Set(T2IParamTypes.Text2AudioLanguage, "ja");
-        Assert.Equal("de", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage));
+        Assert.Equal("de", InvokeGetUserParam(jsonParser, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage));
         input.Set(AceStepFunExtension.Language, "en");
-        Assert.Equal("ja", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage));
+        Assert.Equal("ja", InvokeGetUserParam(jsonParser, AceStepFunExtension.Language, T2IParamTypes.Text2AudioLanguage));
 
         input.Set(AceStepFunExtension.KeyScale, "A minor");
         input.Set(T2IParamTypes.Text2AudioKeyScale, "C major");
-        Assert.Equal("A minor", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale));
+        Assert.Equal("A minor", InvokeGetUserParam(jsonParser, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale));
         input.Set(AceStepFunExtension.KeyScale, "E minor");
-        Assert.Equal("C major", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale));
+        Assert.Equal("C major", InvokeGetUserParam(jsonParser, AceStepFunExtension.KeyScale, T2IParamTypes.Text2AudioKeyScale));
 
         input.Set(AceStepFunExtension.LmModel, "AceStep/qwen_0.6b_ace15.safetensors");
         input.Set(AceStepFunExtension.Text2AudioLmModel, "AceStep/qwen_4b_ace15.safetensors");
-        Assert.Equal("AceStep/qwen_0.6b_ace15.safetensors", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel));
+        Assert.Equal("AceStep/qwen_0.6b_ace15.safetensors", InvokeGetUserParam(jsonParser, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel));
         input.Set(AceStepFunExtension.LmModel, "AceStep/qwen_1.7b_ace15.safetensors");
-        Assert.Equal("AceStep/qwen_4b_ace15.safetensors", InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel));
+        Assert.Equal("AceStep/qwen_4b_ace15.safetensors", InvokeGetUserParam(jsonParser, AceStepFunExtension.LmModel, AceStepFunExtension.Text2AudioLmModel));
 
-        input.Set(AceStepFunExtension.LmCfg, 2.0);
-        input.Set(AceStepFunExtension.Text2AudioLmCfg, 4.5);
-        Assert.Equal(2.0, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmCfg, AceStepFunExtension.Text2AudioLmCfg));
         input.Set(AceStepFunExtension.LmCfg, 1.0);
-        Assert.Equal(4.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.LmCfg, AceStepFunExtension.Text2AudioLmCfg));
+        input.Set(AceStepFunExtension.Text2AudioLmCfg, 4.5);
+        Assert.Equal(1.0, InvokeGetUserParam(jsonParser, AceStepFunExtension.LmCfg, AceStepFunExtension.Text2AudioLmCfg));
+        input.Set(AceStepFunExtension.LmCfg, 2.0);
+        Assert.Equal(4.5, InvokeGetUserParam(jsonParser, AceStepFunExtension.LmCfg, AceStepFunExtension.Text2AudioLmCfg));
 
         input.Set(AceStepFunExtension.AudioCfg, 2.5);
         input.Set(AceStepFunExtension.Text2AudioAudioCfg, 3.5);
-        Assert.Equal(2.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg));
-        input.Set(AceStepFunExtension.AudioCfg, 2.0);
-        Assert.Equal(3.5, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg));
+        Assert.Equal(2.5, InvokeGetUserParam(jsonParser, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg));
+        input.Set(AceStepFunExtension.AudioCfg, 1.0);
+        Assert.Equal(3.5, InvokeGetUserParam(jsonParser, AceStepFunExtension.AudioCfg, AceStepFunExtension.Text2AudioAudioCfg));
 
         input.Set(AceStepFunExtension.Steps, 12L);
         input.Set(AceStepFunExtension.Text2AudioSteps, 33L);
-        Assert.Equal(12L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps));
+        Assert.Equal(12L, InvokeGetUserParam(jsonParser, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps));
         input.Set(AceStepFunExtension.Steps, 8L);
-        Assert.Equal(33L, InvokeGetUserParam(audioWorkflow, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps));
+        Assert.Equal(33L, InvokeGetUserParam(jsonParser, AceStepFunExtension.Steps, AceStepFunExtension.Text2AudioSteps));
     }
 
     [Fact]
@@ -195,6 +197,80 @@ public class AudioWorkflowTests
     }
 
     [Fact]
+    public void ResolvePrompt_UsesAceStepFunSection_ForRootAndAdditionalTracks()
+    {
+        EnsureParamsRegistered();
+        EnsureAudioPromptRegistration();
+
+        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input);
+        input.Set(T2IParamTypes.Prompt, "global setup <acestepfun>shared section <acestepfun[1]>track one section");
+        input.PreparsePromptLikes();
+
+        Assert.Equal("shared section", InvokeResolvePrompt(audioWorkflow));
+        Assert.Equal("track one section", InvokeResolvePrompt(audioWorkflow, 1));
+    }
+
+    [Fact]
+    public void GetTracks_ParsesAdditionalMusicTracks_AndInheritsMissingValues()
+    {
+        EnsureParamsRegistered();
+        EnsureAudioPromptRegistration();
+
+        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input);
+        input.Set(T2IParamTypes.Prompt, "global setup <audio>shared audio section <acestepfun[1]>track one audio section");
+        input.Set(AceStepFunExtension.Style, "cinematic");
+        input.Set(AceStepFunExtension.Duration, 90.0);
+        input.Set(AceStepFunExtension.Bpm, 110L);
+        input.Set(AceStepFunExtension.TimeSignature, "3");
+        input.Set(AceStepFunExtension.Language, "en");
+        input.Set(AceStepFunExtension.KeyScale, "A minor");
+        input.Set(AceStepFunExtension.MusicTracks, new JArray(
+            new JObject
+            {
+                ["Style"] = "ambient",
+                ["Bpm"] = 140L,
+                ["Language"] = "ja"
+            },
+            new JObject
+            {
+                ["Duration"] = 45.0
+            }
+        ).ToString());
+        input.PreparsePromptLikes();
+
+        List<Dictionary<string, object>> tracks = InvokeGetTracks(audioWorkflow);
+
+        Assert.Equal(3, tracks.Count);
+        Assert.Equal(0, tracks[0]["Index"]);
+        Assert.Equal(1, tracks[1]["Index"]);
+        Assert.Equal(2, tracks[2]["Index"]);
+
+        Assert.Equal("shared audio section", tracks[0]["Prompt"]);
+        Assert.Equal("cinematic", tracks[0]["Style"]);
+        Assert.Equal(90.0, tracks[0]["Duration"]);
+        Assert.Equal(110L, tracks[0]["Bpm"]);
+        Assert.Equal("3", tracks[0]["TimeSignature"]);
+        Assert.Equal("en", tracks[0]["Language"]);
+        Assert.Equal("A minor", tracks[0]["KeyScale"]);
+
+        Assert.Equal("track one audio section", tracks[1]["Prompt"]);
+        Assert.Equal("ambient", tracks[1]["Style"]);
+        Assert.Equal(90.0, tracks[1]["Duration"]);
+        Assert.Equal(140L, tracks[1]["Bpm"]);
+        Assert.Equal("3", tracks[1]["TimeSignature"]);
+        Assert.Equal("ja", tracks[1]["Language"]);
+        Assert.Equal("A minor", tracks[1]["KeyScale"]);
+
+        Assert.Equal("shared audio section", tracks[2]["Prompt"]);
+        Assert.Equal("ambient", tracks[2]["Style"]);
+        Assert.Equal(45.0, tracks[2]["Duration"]);
+        Assert.Equal(140L, tracks[2]["Bpm"]);
+        Assert.Equal("3", tracks[2]["TimeSignature"]);
+        Assert.Equal("ja", tracks[2]["Language"]);
+        Assert.Equal("A minor", tracks[2]["KeyScale"]);
+    }
+
+    [Fact]
     public void PreparsePromptLikes_RewritesAudioTagWithAceStepSectionId()
     {
         EnsureParamsRegistered();
@@ -206,6 +282,55 @@ public class AudioWorkflowTests
 
         string parsedPrompt = input.Get(T2IParamTypes.Prompt, "");
         Assert.Contains($"<audio//cid={AceStepFunExtension.SectionID_Audio}>", parsedPrompt);
+    }
+
+    [Fact]
+    public void PreparsePromptLikes_RewritesAceStepFunTagWithAceStepSectionId()
+    {
+        EnsureParamsRegistered();
+        EnsureAudioPromptRegistration();
+
+        T2IParamInput input = new(null);
+        input.Set(T2IParamTypes.Prompt, "global <acestepfun[1]>chorus lyrics");
+        input.PreparsePromptLikes();
+
+        string parsedPrompt = input.Get(T2IParamTypes.Prompt, "");
+        Assert.Contains($"<acestepfun//cid={AceStepFunExtension.AceStepSectionIdForTrack(1)}>", parsedPrompt);
+    }
+
+    [Fact]
+    public void GetTracks_AppliesAceStepSectionParamOverridesOnlyToMatchingTrack()
+    {
+        EnsureParamsRegistered();
+        EnsureAudioPromptRegistration();
+
+        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input);
+        input.Set(T2IParamTypes.Prompt,
+            "global"
+            + $" <acestepfun><param[{AceStepFunExtension.Style.Type.ID}]:shared style><param[{AceStepFunExtension.Steps.Type.ID}]:9>shared prompt"
+            + $" <acestepfun[1]><param[{AceStepFunExtension.Style.Type.ID}]:track one style><param[{AceStepFunExtension.AudioCfg.Type.ID}]:4.5><param[{AceStepFunExtension.Duration.Type.ID}]:33>track one prompt");
+        input.Set(AceStepFunExtension.MusicTracks, new JArray(new JObject(), new JObject()).ToString());
+        input.PreparsePromptLikes();
+
+        List<Dictionary<string, object>> tracks = InvokeGetTracks(audioWorkflow);
+
+        Assert.Equal(3, tracks.Count);
+        Assert.Equal(0, tracks[0]["Index"]);
+        Assert.Equal(1, tracks[1]["Index"]);
+        Assert.Equal(2, tracks[2]["Index"]);
+        Assert.Equal("shared style", tracks[0]["Style"]);
+        Assert.Equal(9, tracks[0]["Steps"]);
+        Assert.Equal(1.0, tracks[0]["AudioCfg"]);
+
+        Assert.Equal("track one style", tracks[1]["Style"]);
+        Assert.Equal(9, tracks[1]["Steps"]);
+        Assert.Equal(4.5, tracks[1]["AudioCfg"]);
+        Assert.Equal(33.0, tracks[1]["Duration"]);
+
+        Assert.Equal("shared style", tracks[2]["Style"]);
+        Assert.Equal(9, tracks[2]["Steps"]);
+        Assert.Equal(1.0, tracks[2]["AudioCfg"]);
+        Assert.Equal(120.0, tracks[2]["Duration"]);
     }
 
     [Fact]
@@ -261,6 +386,31 @@ public class AudioWorkflowTests
     }
 
     [Fact]
+    public void IsExtensionActive_IsTrue_ForAceStepMainModelWithMusicTracksOnly()
+    {
+        EnsureParamsRegistered();
+
+        T2IParamInput input = new(null);
+        input.Set(T2IParamTypes.Model, FakeAceStepModel());
+        input.Set(AceStepFunExtension.MusicTracks, new JArray(
+            new JObject
+            {
+                ["Style"] = "layered synth",
+                ["Duration"] = 60.0
+            }
+        ).ToString());
+
+        WorkflowGenerator generator = new()
+        {
+            UserInput = input,
+            Workflow = new JObject()
+        };
+
+        Runner runner = new(generator);
+        Assert.True(InvokeIsExtensionActive(runner));
+    }
+
+    [Fact]
     public void ApplyConfiguredLoras_AddsModelOnlyLoaders_ForGlobalAndAudioPromptLoras()
     {
         EnsureParamsRegistered();
@@ -298,6 +448,53 @@ public class AudioWorkflowTests
     }
 
     [Fact]
+    public void ApplyConfiguredLoras_UsesOnlyGlobalAndMatchingAceStepTrackLoras()
+    {
+        EnsureParamsRegistered();
+        EnsureFakeLoraModel("global-lora");
+        EnsureFakeLoraModel("track-one-lora");
+        EnsureFakeLoraModel("track-two-lora");
+
+        object audioWorkflow = CreateAudioWorkflow(out T2IParamInput input, out WorkflowGenerator generator);
+        input.Set(T2IParamTypes.Loras, ["global-lora", "track-one-lora", "track-two-lora"]);
+        input.Set(T2IParamTypes.LoraWeights, ["0.75", "0.5", "0.25"]);
+        input.Set(T2IParamTypes.LoraSectionConfinement, [
+            "0",
+            $"{AceStepFunExtension.AceStepSectionIdForTrack(1)}",
+            $"{AceStepFunExtension.AceStepSectionIdForTrack(2)}"
+        ]);
+        generator.Workflow["4"] = new JObject
+        {
+            ["class_type"] = "UNETLoader",
+            ["inputs"] = new JObject
+            {
+                ["unet_name"] = "audio/acestep_v1.5_merge_sft_turbo_ta_0.5",
+                ["weight_dtype"] = "default"
+            }
+        };
+
+        JArray resultPath = InvokeApplyConfiguredLoras(audioWorkflow, new JArray("4", 0), 1);
+
+        JObject trackLoraNode = Assert.IsType<JObject>(generator.Workflow[$"{resultPath[0]}"]);
+        Assert.Equal("LoraLoaderModelOnly", $"{trackLoraNode["class_type"]}");
+        JObject trackLoraInputs = Assert.IsType<JObject>(trackLoraNode["inputs"]);
+        Assert.Equal("track-one-lora.safetensors", $"{trackLoraInputs["lora_name"]}");
+        Assert.Equal(0.5, trackLoraInputs["strength_model"]?.Value<double>());
+
+        JArray previousModelPath = Assert.IsType<JArray>(trackLoraInputs["model"]);
+        JObject globalLoraNode = Assert.IsType<JObject>(generator.Workflow[$"{previousModelPath[0]}"]);
+        Assert.Equal("LoraLoaderModelOnly", $"{globalLoraNode["class_type"]}");
+        JObject globalLoraInputs = Assert.IsType<JObject>(globalLoraNode["inputs"]);
+        Assert.Equal("global-lora.safetensors", $"{globalLoraInputs["lora_name"]}");
+        Assert.Equal(0.75, globalLoraInputs["strength_model"]?.Value<double>());
+
+        Assert.DoesNotContain(generator.Workflow.Properties(), prop =>
+            prop.Value is JObject node
+            && node["inputs"] is JObject inputs
+            && $"{inputs["lora_name"]}" == "track-two-lora.safetensors");
+    }
+
+    [Fact]
     public void TryPatchExistingText2AudioGraph_ReplacesGenericLoraLoader_WithModelOnlyLoader()
     {
         EnsureFakeLoraModel("global-lora");
@@ -313,10 +510,8 @@ public class AudioWorkflowTests
             Workflow = BuildPatchableWorkflowWithGenericLora()
         };
 
-        Type audioWorkflowType = typeof(AceStepFunExtension).Assembly.GetType("AceStepFun.AudioWorkflow")
-            ?? throw new InvalidOperationException("Could not find AceStepFun.AudioWorkflow.");
-        object audioWorkflow = Activator.CreateInstance(audioWorkflowType, generator)
-            ?? throw new InvalidOperationException("Could not create AceStepFun.AudioWorkflow.");
+        object audioWorkflow = CreateAudioWorkflow(generator);
+        SetAudioWorkflowParams(audioWorkflow, [PatchedTrack()]);
 
         bool patched = InvokeTryPatchExistingText2AudioGraph(audioWorkflow);
 
@@ -341,6 +536,73 @@ public class AudioWorkflowTests
     }
 
     [Fact]
+    public void TryPatchExistingText2AudioGraph_CreatesSeparateOutputBranch_ForAdditionalTrack()
+    {
+        WorkflowGenerator generator = new()
+        {
+            UserInput = new T2IParamInput(null),
+            Workflow = BuildPatchableWorkflow()
+        };
+
+        object audioWorkflow = CreateAudioWorkflow(generator);
+
+        SetAudioWorkflowParams(audioWorkflow, [
+            PatchedTrack(),
+            (1, "layered lyrics", "layered tags", 22.0, 140L, "6", "ja", "C major")
+        ]);
+
+        bool patched = InvokeTryPatchExistingText2AudioGraph(audioWorkflow);
+
+        Assert.True(patched);
+
+        JObject samplerNode = Assert.IsType<JObject>(generator.Workflow["5"]);
+        JObject samplerInputs = Assert.IsType<JObject>(samplerNode["inputs"]);
+        JArray positivePath = Assert.IsType<JArray>(samplerInputs["positive"]);
+        Assert.Equal("2", $"{positivePath[0]}");
+        Assert.DoesNotContain(generator.Workflow.Properties(), prop => $"{((JObject)prop.Value)["class_type"]}" == "ConditioningCombine");
+
+        JObject rootLatentNode = Assert.IsType<JObject>(generator.Workflow["8"]);
+        JObject rootLatentInputs = Assert.IsType<JObject>(rootLatentNode["inputs"]);
+        Assert.Equal(15.0, rootLatentInputs["seconds"]?.Value<double>());
+
+        JProperty extraSaveProp = Assert.Single(
+            generator.Workflow.Properties(),
+            prop => $"{((JObject)prop.Value)["class_type"]}" == "SaveAudioMP3"
+        );
+        JObject extraSaveNode = Assert.IsType<JObject>(extraSaveProp.Value);
+        JObject extraSaveInputs = Assert.IsType<JObject>(extraSaveNode["inputs"]);
+        Assert.Equal("SwarmUI_track_2_", $"{extraSaveInputs["filename_prefix"]}");
+
+        JArray extraAudioPath = Assert.IsType<JArray>(extraSaveInputs["audio"]);
+        JObject extraDecodeNode = Assert.IsType<JObject>(generator.Workflow[$"{extraAudioPath[0]}"]);
+        Assert.Equal("VAEDecodeAudio", $"{extraDecodeNode["class_type"]}");
+        JObject extraDecodeInputs = Assert.IsType<JObject>(extraDecodeNode["inputs"]);
+
+        JArray extraSamplerPath = Assert.IsType<JArray>(extraDecodeInputs["samples"]);
+        Assert.NotEqual("5", $"{extraSamplerPath[0]}");
+        JObject extraSamplerNode = Assert.IsType<JObject>(generator.Workflow[$"{extraSamplerPath[0]}"]);
+        Assert.Equal("SwarmKSampler", $"{extraSamplerNode["class_type"]}");
+        JObject extraSamplerInputs = Assert.IsType<JObject>(extraSamplerNode["inputs"]);
+
+        JArray extraConditioningPath = Assert.IsType<JArray>(extraSamplerInputs["positive"]);
+        JObject extraEncodeNode = Assert.IsType<JObject>(generator.Workflow[$"{extraConditioningPath[0]}"]);
+        Assert.Equal("TextEncodeAceStepAudio1.5", $"{extraEncodeNode["class_type"]}");
+        JObject extraEncodeInputs = Assert.IsType<JObject>(extraEncodeNode["inputs"]);
+        Assert.Equal("layered lyrics", $"{extraEncodeInputs["lyrics"]}");
+        Assert.Equal("layered tags", $"{extraEncodeInputs["tags"]}");
+        Assert.Equal(22.0, extraEncodeInputs["duration"]?.Value<double>());
+        Assert.Equal(140L, extraEncodeInputs["bpm"]?.Value<long>());
+        Assert.Equal("6", $"{extraEncodeInputs["timesignature"]}");
+        Assert.Equal("ja", $"{extraEncodeInputs["language"]}");
+        Assert.Equal("C major", $"{extraEncodeInputs["keyscale"]}");
+
+        JArray extraLatentPath = Assert.IsType<JArray>(extraSamplerInputs["latent_image"]);
+        JObject extraLatentNode = Assert.IsType<JObject>(generator.Workflow[$"{extraLatentPath[0]}"]);
+        JObject extraLatentInputs = Assert.IsType<JObject>(extraLatentNode["inputs"]);
+        Assert.Equal(22.0, extraLatentInputs["seconds"]?.Value<double>());
+    }
+
+    [Fact]
     public void TryPatchExistingText2AudioGraph_DoesNotThrow_WhenAuraNodeMustBeInserted()
     {
         WorkflowGenerator generator = new()
@@ -349,10 +611,8 @@ public class AudioWorkflowTests
             Workflow = BuildPatchableWorkflow()
         };
 
-        Type audioWorkflowType = typeof(AceStepFunExtension).Assembly.GetType("AceStepFun.AudioWorkflow")
-            ?? throw new InvalidOperationException("Could not find AceStepFun.AudioWorkflow.");
-        object audioWorkflow = Activator.CreateInstance(audioWorkflowType, generator)
-            ?? throw new InvalidOperationException("Could not create AceStepFun.AudioWorkflow.");
+        object audioWorkflow = CreateAudioWorkflow(generator);
+        SetAudioWorkflowParams(audioWorkflow, [PatchedTrack()]);
 
         bool patched = InvokeTryPatchExistingText2AudioGraph(audioWorkflow);
 
@@ -389,33 +649,7 @@ public class AudioWorkflowTests
 
     private static bool InvokeTryPatchExistingText2AudioGraph(object audioWorkflow)
     {
-        Type awType = audioWorkflow.GetType();
-        Type paramsType = awType.GetNestedType("AudioParams", BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("Could not find AudioParams type.");
-        object paramsInstance = Activator.CreateInstance(paramsType, [
-            "patched lyrics",
-            "AceStep/qwen_0.6b_ace15.safetensors",
-            "AceStep/qwen_1.7b_ace15.safetensors",
-            "patched tags",
-            123L,
-            133L,
-            15.0,
-            160L,
-            "4",
-            "en",
-            "E minor",
-            2.0,
-            2.0,
-            8,
-            "euler",
-            "simple",
-            3.0
-        ]) ?? throw new InvalidOperationException("Could not create AudioParams.");
-        FieldInfo paramsField = awType.GetField("Params", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("Could not find Params field.");
-        paramsField.SetValue(audioWorkflow, paramsInstance);
-
-        MethodInfo patchMethod = awType.GetMethod("TryPatchExistingText2AudioGraph", BindingFlags.Instance | BindingFlags.NonPublic)
+        MethodInfo patchMethod = audioWorkflow.GetType().GetMethod("TryPatchExistingText2AudioGraph", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("Could not find TryPatchExistingText2AudioGraph.");
         try
         {
@@ -439,7 +673,7 @@ public class AudioWorkflowTests
 
     private static JArray InvokeApplyConfiguredLoras(object audioWorkflow, JArray modelPath)
     {
-        MethodInfo applyConfiguredLoras = audioWorkflow.GetType().GetMethod("ApplyConfiguredLoras", BindingFlags.Instance | BindingFlags.NonPublic)
+        MethodInfo applyConfiguredLoras = audioWorkflow.GetType().GetMethod("ApplyConfiguredLoras", BindingFlags.Instance | BindingFlags.NonPublic, null, [typeof(JArray)], null)
             ?? throw new InvalidOperationException("Could not find ApplyConfiguredLoras.");
         try
         {
@@ -453,9 +687,25 @@ public class AudioWorkflowTests
         }
     }
 
+    private static JArray InvokeApplyConfiguredLoras(object audioWorkflow, JArray modelPath, int trackIndex)
+    {
+        MethodInfo applyConfiguredLoras = audioWorkflow.GetType().GetMethod("ApplyConfiguredLoras", BindingFlags.Instance | BindingFlags.NonPublic, null, [typeof(JArray), typeof(int)], null)
+            ?? throw new InvalidOperationException("Could not find ApplyConfiguredLoras.");
+        try
+        {
+            object result = applyConfiguredLoras.Invoke(audioWorkflow, [modelPath, trackIndex]);
+            return Assert.IsType<JArray>(result);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+    }
+
     private static string InvokeResolvePrompt(object audioWorkflow)
     {
-        MethodInfo resolvePrompt = audioWorkflow.GetType().GetMethod("ResolvePrompt", BindingFlags.Instance | BindingFlags.NonPublic)
+        MethodInfo resolvePrompt = audioWorkflow.GetType().GetMethod("ResolvePrompt", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes, null)
             ?? throw new InvalidOperationException("Could not find ResolvePrompt.");
         try
         {
@@ -467,6 +717,106 @@ public class AudioWorkflowTests
             ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
             throw;
         }
+    }
+
+    private static string InvokeResolvePrompt(object audioWorkflow, int trackIndex)
+    {
+        MethodInfo resolvePrompt = audioWorkflow.GetType().GetMethod("ResolvePrompt", BindingFlags.Instance | BindingFlags.NonPublic, null, [typeof(int)], null)
+            ?? throw new InvalidOperationException("Could not find indexed ResolvePrompt.");
+        try
+        {
+            object result = resolvePrompt.Invoke(audioWorkflow, [trackIndex]);
+            return Assert.IsType<string>(result);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+    }
+
+    private static List<Dictionary<string, object>> InvokeGetTracks(object audioWorkflow)
+    {
+        MethodInfo getTracks = audioWorkflow.GetType().GetMethod("GetTracks", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Could not find GetTracks.");
+        try
+        {
+            object result = getTracks.Invoke(audioWorkflow, []);
+            IEnumerable tracks = Assert.IsAssignableFrom<IEnumerable>(result);
+            List<Dictionary<string, object>> parsedTracks = [];
+            foreach (object track in tracks)
+            {
+                Dictionary<string, object> values = [];
+                foreach (PropertyInfo property in track.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                {
+                    values[property.Name] = property.GetValue(track);
+                }
+                parsedTracks.Add(values);
+            }
+            return parsedTracks;
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+    }
+
+    private static void SetAudioWorkflowParams(
+        object audioWorkflow,
+        IReadOnlyList<(int Index, string Prompt, string Style, double Duration, long Bpm, string TimeSignature, string Language, string KeyScale)> tracks)
+    {
+        Type awType = audioWorkflow.GetType();
+        Type trackType = typeof(JsonParser.TrackSpec);
+        Type trackListType = typeof(List<>).MakeGenericType(trackType);
+        IList trackList = Activator.CreateInstance(trackListType) as IList
+            ?? throw new InvalidOperationException("Could not create track list.");
+
+        foreach ((int index, string prompt, string style, double duration, long bpm, string timeSignature, string language, string keyScale) in tracks)
+        {
+            object trackInstance = Activator.CreateInstance(trackType, [
+                index,
+                prompt,
+                style,
+                duration,
+                bpm,
+                timeSignature,
+                language,
+                keyScale,
+                "AceStep/qwen_1.7b_ace15.safetensors",
+                2.0,
+                2.0,
+                8,
+                3.0,
+                "euler",
+                "simple"
+            ]) ?? throw new InvalidOperationException("Could not create TrackSpec.");
+            trackList.Add(trackInstance);
+        }
+
+        Type paramsType = awType.GetNestedType("AudioParams", BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Could not find AudioParams type.");
+        object paramsInstance = Activator.CreateInstance(paramsType, [
+            trackList,
+            "AceStep/qwen_0.6b_ace15.safetensors",
+            "AceStep/qwen_1.7b_ace15.safetensors",
+            123L,
+            133L,
+            2.0,
+            2.0,
+            8,
+            "euler",
+            "simple",
+            3.0
+        ]) ?? throw new InvalidOperationException("Could not create AudioParams.");
+        FieldInfo paramsField = awType.GetField("Params", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Could not find Params field.");
+        paramsField.SetValue(audioWorkflow, paramsInstance);
+    }
+
+    private static (int Index, string Prompt, string Style, double Duration, long Bpm, string TimeSignature, string Language, string KeyScale) PatchedTrack()
+    {
+        return (0, "patched lyrics", "patched tags", 15.0, 160L, "4", "en", "E minor");
     }
 
     private static object CreateAudioWorkflow(out T2IParamInput input)
@@ -482,20 +832,35 @@ public class AudioWorkflowTests
             UserInput = input,
             Workflow = new JObject()
         };
+        return CreateAudioWorkflow(generator);
+    }
+
+    private static object CreateAudioWorkflow(WorkflowGenerator generator)
+    {
         Type audioWorkflowType = typeof(AceStepFunExtension).Assembly.GetType("AceStepFun.AudioWorkflow")
             ?? throw new InvalidOperationException("Could not find AceStepFun.AudioWorkflow.");
         return Activator.CreateInstance(audioWorkflowType, generator)
             ?? throw new InvalidOperationException("Could not create AceStepFun.AudioWorkflow.");
     }
 
-    private static T InvokeGetUserParam<T>(object audioWorkflow, T2IRegisteredParam<T> primary, T2IRegisteredParam<T> fallback)
+    private static object CreateJsonParser(T2IParamInput input)
     {
-        MethodInfo getUserParam = audioWorkflow.GetType().GetMethod("GetUserParam", BindingFlags.Instance | BindingFlags.NonPublic)
+        WorkflowGenerator generator = new()
+        {
+            UserInput = input,
+            Workflow = new JObject()
+        };
+        return new JsonParser(generator);
+    }
+
+    private static T InvokeGetUserParam<T>(object jsonParser, T2IRegisteredParam<T> primary, T2IRegisteredParam<T> fallback)
+    {
+        MethodInfo getUserParam = jsonParser.GetType().GetMethod("GetUserParam", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("Could not find GetUserParam.");
         MethodInfo generic = getUserParam.MakeGenericMethod(typeof(T));
         try
         {
-            object result = generic.Invoke(audioWorkflow, [primary, fallback]);
+            object result = generic.Invoke(jsonParser, [primary, fallback]);
             return Assert.IsType<T>(result);
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)

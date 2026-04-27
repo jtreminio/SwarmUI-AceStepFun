@@ -18,12 +18,7 @@ internal static class AceStepLoraParser
         List<string> confinements = input.Get(T2IParamTypes.LoraSectionConfinement);
         for (int i = 0; i < loras.Count; i++)
         {
-            int confinement = -1;
-            if (confinements is not null && confinements.Count > i)
-            {
-                confinement = int.Parse(confinements[i]);
-            }
-            if (IsRelevantConfinement(confinement))
+            if (IsAceStepConfinement(GetConfinement(confinements, i)))
             {
                 return true;
             }
@@ -33,6 +28,11 @@ internal static class AceStepLoraParser
     }
 
     public static List<AceStepLora> ResolveRelevantLoras(T2IParamInput input, string modelFolderFormat)
+    {
+        return ResolveRelevantLoras(input, modelFolderFormat, 0);
+    }
+
+    public static List<AceStepLora> ResolveRelevantLoras(T2IParamInput input, string modelFolderFormat, int trackIndex)
     {
         if (!input.TryGet(T2IParamTypes.Loras, out List<string> loras) || loras.Count == 0)
         {
@@ -53,12 +53,7 @@ internal static class AceStepLoraParser
         List<AceStepLora> result = [];
         for (int i = 0; i < loras.Count; i++)
         {
-            int confinement = -1;
-            if (confinements is not null && confinements.Count > i)
-            {
-                confinement = int.Parse(confinements[i]);
-            }
-            if (!IsRelevantConfinement(confinement))
+            if (!IsRelevantConfinement(GetConfinement(confinements, i), trackIndex))
             {
                 continue;
             }
@@ -82,11 +77,30 @@ internal static class AceStepLoraParser
         return lora;
     }
 
-    private static bool IsRelevantConfinement(int confinement)
+    private static int GetConfinement(List<string> confinements, int index)
+    {
+        if (confinements is null || confinements.Count <= index)
+        {
+            return -1;
+        }
+
+        return int.Parse(confinements[index]);
+    }
+
+    private static bool IsRelevantConfinement(int confinement, int trackIndex)
     {
         return confinement == -1
             || confinement == 0
             || confinement == T2IParamInput.SectionID_BaseOnly
-            || confinement == AceStepFunExtension.SectionID_Audio;
+            || confinement == AceStepFunExtension.SectionID_Audio
+            || confinement == AceStepFunExtension.AceStepSectionIdForTrack(trackIndex);
+    }
+
+    private static bool IsAceStepConfinement(int confinement)
+    {
+        return confinement == -1
+            || confinement == 0
+            || confinement == T2IParamInput.SectionID_BaseOnly
+            || confinement >= AceStepFunExtension.SectionID_Audio;
     }
 }

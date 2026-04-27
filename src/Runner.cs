@@ -45,6 +45,7 @@ public class Runner(WorkflowGenerator g)
             || HasRaw(AceStepFunExtension.TimeSignature)
             || HasRaw(AceStepFunExtension.Language)
             || HasRaw(AceStepFunExtension.KeyScale)
+            || HasRaw(AceStepFunExtension.MusicTracks)
             || HasRaw(T2IParamTypes.Text2AudioStyle)
             || HasRaw(T2IParamTypes.Text2AudioDuration)
             || HasRaw(T2IParamTypes.Text2AudioBPM)
@@ -63,6 +64,6 @@ public class Runner(WorkflowGenerator g)
 
     private bool HasRaw<T>(T2IRegisteredParam<T> param)
     {
-        return param?.Type is not null && g.UserInput.TryGetRaw(param?.Type, out _);
+        return param?.Type is not null && g.UserInput.TryGetRaw(param.Type, out _);
     }
 }

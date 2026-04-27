@@ -7,17 +7,11 @@ namespace AceStepFun;
 internal class AudioWorkflow(WorkflowGenerator g)
 {
     private sealed record AudioParams(
-        string Prompt,
+        List<JsonParser.TrackSpec> Tracks,
         string Clip1,
         string Clip2,
-        string Style,
         long Seed,
         long ConditioningSeed,
-        double Duration,
-        long Bpm,
-        string TimeSignature,
-        string Language,
-        string KeyScale,
         double LmCfgScale,
         double AudioCfg,
         int Steps,
@@ -32,10 +26,17 @@ internal class AudioWorkflow(WorkflowGenerator g)
         bool RequiresNormalization
     );
 
+    private sealed record PatchedSamplerOutput(
+        int BranchIndex,
+        JArray ModelPath,
+        JArray VaePath
+    );
+
     private const int AudioIdBase = 64100;
     private const string DefaultClip1 = "AceStep/qwen_0.6b_ace15.safetensors";
-    private const string DefaultClip2 = "AceStep/qwen_1.7b_ace15.safetensors";
     private AudioParams Params;
+    private WorkflowGenerator.ModelLoadHelpers Helpers;
+    private Dictionary<string, JArray> ClipPathCache;
 
     public void Run()
     {
@@ -45,57 +46,23 @@ internal class AudioWorkflow(WorkflowGenerator g)
             return;
         }
 
-        WorkflowGenerator.ModelLoadHelpers helpers = new(g);
-        string clip2Selection = GetUserParam(
-            AceStepFunExtension.LmModel,
-            AceStepFunExtension.Text2AudioLmModel
-        );
+        Helpers = new(g);
+        ClipPathCache = [];
         (string clip1Name, string clip1Url, string clip1Hash) = GetClipInfo(DefaultClip1);
-        (string clip2Name, string clip2Url, string clip2Hash) = GetClipInfo(clip2Selection);
         long seed = g.UserInput.Get(T2IParamTypes.Seed, 0);
+        List<JsonParser.TrackSpec> tracks = GetTracks();
+        string clip2Selection = tracks[0].LmModel;
+        (string clip2Name, string clip2Url, string clip2Hash) = GetClipInfo(clip2Selection);
         Params = new(
-            Prompt: ResolvePrompt(),
-            Clip1: helpers.RequireClipModel(clip1Name, clip1Url, clip1Hash, null),
-            Clip2: helpers.RequireClipModel(clip2Name, clip2Url, clip2Hash, null),
-            Style: GetUserParam(
-                AceStepFunExtension.Style,
-                T2IParamTypes.Text2AudioStyle
-            ),
+            Tracks: tracks,
+            Clip1: Helpers.RequireClipModel(clip1Name, clip1Url, clip1Hash, null),
+            Clip2: Helpers.RequireClipModel(clip2Name, clip2Url, clip2Hash, null),
             Seed: seed,
             ConditioningSeed: seed + 10,
-            Duration: GetUserParam(
-                AceStepFunExtension.Duration,
-                T2IParamTypes.Text2AudioDuration
-            ),
-            Bpm: GetUserParam(
-                AceStepFunExtension.Bpm,
-                T2IParamTypes.Text2AudioBPM
-            ),
-            TimeSignature: GetUserParam(
-                AceStepFunExtension.TimeSignature,
-                T2IParamTypes.Text2AudioTimeSignature
-            ),
-            Language: GetUserParam(
-                AceStepFunExtension.Language,
-                T2IParamTypes.Text2AudioLanguage
-            ),
-            KeyScale: GetUserParam(
-                AceStepFunExtension.KeyScale,
-                T2IParamTypes.Text2AudioKeyScale
-            ),
-            LmCfgScale: GetUserParam(
-                AceStepFunExtension.LmCfg,
-                AceStepFunExtension.Text2AudioLmCfg
-            ),
-            AudioCfg: GetUserParam(
-                AceStepFunExtension.AudioCfg,
-                AceStepFunExtension.Text2AudioAudioCfg
-            ),
-            Steps: (int)GetUserParam(
-                AceStepFunExtension.Steps,
-                AceStepFunExtension.Text2AudioSteps
-            ),
-            SigmaShift: g.UserInput.Get(AceStepFunExtension.Text2AudioSigmaShift, 3.0)
+            LmCfgScale: tracks[0].LmCfgScale,
+            AudioCfg: tracks[0].AudioCfg,
+            Steps: tracks[0].Steps,
+            SigmaShift: tracks[0].SigmaShift
         );
 
         bool mainModelIsAceStep = g.UserInput.TryGet(T2IParamTypes.Model, out T2IModel mainModel)
@@ -106,88 +73,24 @@ internal class AudioWorkflow(WorkflowGenerator g)
             return;
         }
 
-        string clipNode = g.CreateNode(NodeTypes.DualClipLoader, new JObject
-        {
-            ["clip_name1"] = Params.Clip1,
-            ["clip_name2"] = Params.Clip2,
-            ["type"] = "ace",
-            ["device"] = "default"
-        }, g.GetStableDynamicID(AudioIdBase + 10, 0));
-
         string modelNode = g.CreateNode(NodeTypes.UNetLoader, new JObject
         {
             ["unet_name"] = aceModel.ToString(g.ModelFolderFormat),
             ["weight_dtype"] = "default"
         }, g.GetStableDynamicID(AudioIdBase + 20, 0));
 
-        JArray modelPath = ApplyConfiguredLoras(new JArray(modelNode, 0));
-
-        string samplingNode = g.CreateNode(NodeTypes.ModelSamplingAuraFlow, new JObject
-        {
-            ["model"] = modelPath,
-            ["shift"] = Params.SigmaShift
-        }, g.GetStableDynamicID(AudioIdBase + 25, 0));
-
         JArray previousVae = g.LoadingVAE;
-        helpers.DoVaeLoader(null, T2IModelClassSorter.CompatAceStep15, "ace-step-15-vae");
+        Helpers.DoVaeLoader(null, T2IModelClassSorter.CompatAceStep15, "ace-step-15-vae");
         JArray vaeNode = g.LoadingVAE;
         g.LoadingVAE = previousVae;
 
-        JObject positivePromptInputs = new()
+        JArray baseModelPath = new(modelNode, 0);
+        foreach (JsonParser.TrackSpec track in Params.Tracks)
         {
-            ["clip"] = new JArray(clipNode, 0)
-        };
-        ApplyPromptInputs(positivePromptInputs);
-        string positivePromptNode = g.CreateNode(NodeTypes.TextEncodeAceStepAudio, positivePromptInputs, g.GetStableDynamicID(AudioIdBase + 30, 0));
-
-        JObject negativePromptInputs = new()
-        {
-            ["clip"] = new JArray(clipNode, 0)
-        };
-        ApplyPromptInputs(negativePromptInputs);
-        string negativePromptNode = g.CreateNode(NodeTypes.TextEncodeAceStepAudio, negativePromptInputs, g.GetStableDynamicID(AudioIdBase + 35, 0));
-
-        string latentNode = g.CreateNode(NodeTypes.EmptyAceStepAudioLatent, new JObject
-        {
-            ["batch_size"] = g.UserInput.Get(T2IParamTypes.BatchSize, 1),
-            ["seconds"] = Params.Duration
-        }, g.GetStableDynamicID(AudioIdBase + 40, 0));
-
-        string zeroedNegativeNode = g.CreateNode(NodeTypes.ConditioningZeroOut, new JObject
-        {
-            ["conditioning"] = new JArray(negativePromptNode, 0)
-        }, g.GetStableDynamicID(AudioIdBase + 45, 0));
-
-        string samplerNode = g.CreateNode(NodeTypes.SwarmKSampler, new JObject
-        {
-            ["model"] = new JArray(samplingNode, 0),
-            ["noise_seed"] = Params.Seed,
-            ["steps"] = Params.Steps,
-            ["cfg"] = Params.AudioCfg,
-            ["sampler_name"] = Params.AudioSamplerName,
-            ["scheduler"] = Params.AudioScheduler,
-            ["positive"] = new JArray(positivePromptNode, 0),
-            ["negative"] = new JArray(zeroedNegativeNode, 0),
-            ["latent_image"] = new JArray(latentNode, 0),
-            ["start_at_step"] = 0,
-            ["end_at_step"] = 10000,
-            ["return_with_leftover_noise"] = "disable",
-            ["add_noise"] = "enable",
-            ["var_seed"] = g.UserInput.Get(T2IParamTypes.VariationSeed, 0),
-            ["var_seed_strength"] = g.UserInput.Get(T2IParamTypes.VariationSeedStrength, 0),
-            ["sigma_min"] = g.UserInput.Get(T2IParamTypes.SamplerSigmaMin, -1),
-            ["sigma_max"] = g.UserInput.Get(T2IParamTypes.SamplerSigmaMax, -1),
-            ["rho"] = g.UserInput.Get(T2IParamTypes.SamplerRho, 7),
-            ["previews"] = g.UserInput.Get(T2IParamTypes.NoPreviews) ? "none" : "default",
-            ["tile_sample"] = false,
-            ["tile_size"] = 768
-        }, g.GetStableDynamicID(AudioIdBase + 50, 0));
-
-        _ = g.CreateNode(NodeTypes.VAEDecodeAudio, new JObject
-        {
-            ["samples"] = new JArray(samplerNode, 0),
-            ["vae"] = vaeNode
-        }, g.GetStableDynamicID(AudioIdBase + 60, 0));
+            JArray clipPath = CreateTrackClipPath(track, branchIndex: 0);
+            JArray modelPathForSampling = CreateTrackSamplerModelPath(baseModelPath, track);
+            _ = CreateTrackOutputBranch(clipPath, modelPathForSampling, vaeNode, track, branchIndex: 0);
+        }
     }
 
     private bool TryPatchExistingText2AudioGraph()
@@ -196,7 +99,9 @@ internal class AudioWorkflow(WorkflowGenerator g)
         HashSet<string> aceEncodeNodeIds = [];
         HashSet<string> aceLatentNodeIds = [];
         HashSet<string> samplerNodeIds = [];
+        Dictionary<string, JArray> patchedSamplerBaseModels = [];
         List<JObject> samplersNeedingZeroedNegative = [];
+        JArray sharedClipPath = null;
         int encodeNodeCount = 0;
 
         foreach (JProperty prop in g.Workflow.Properties().ToList())
@@ -217,15 +122,19 @@ internal class AudioWorkflow(WorkflowGenerator g)
                     JArray normalizedClipPath = NormalizeClipPath(clipPath);
                     encodeInputs["clip"] = normalizedClipPath;
                     referencedClipNodeIds.Add($"{normalizedClipPath[0]}");
+                    if (sharedClipPath is null)
+                    {
+                        sharedClipPath = new JArray(normalizedClipPath);
+                    }
                 }
                 aceEncodeNodeIds.Add(prop.Name);
-                ApplyPromptInputs(encodeInputs);
+                ApplyTrackInputs(encodeInputs, Params.Tracks[0]);
                 encodeNodeCount++;
             }
             else if (classType == NodeTypes.EmptyAceStepAudioLatent
                 && node["inputs"] is JObject latentInputs)
             {
-                latentInputs["seconds"] = Params.Duration;
+                latentInputs["seconds"] = Params.Tracks[0].Duration;
                 aceLatentNodeIds.Add(prop.Name);
             }
         }
@@ -251,13 +160,14 @@ internal class AudioWorkflow(WorkflowGenerator g)
             {
                 continue;
             }
-            samplerInputs["steps"] = Params.Steps;
-            samplerInputs["cfg"] = Params.AudioCfg;
-            samplerInputs["sampler_name"] = Params.AudioSamplerName;
-            samplerInputs["scheduler"] = Params.AudioScheduler;
+            samplerInputs["steps"] = Params.Tracks[0].Steps;
+            samplerInputs["cfg"] = Params.Tracks[0].AudioCfg;
+            samplerInputs["sampler_name"] = Params.Tracks[0].AudioSamplerName;
+            samplerInputs["scheduler"] = Params.Tracks[0].AudioScheduler;
             JArray modelInput = GetInputPath(samplerInputs, "model");
-            modelInput = ApplyConfiguredLorasToSamplerModel(modelInput);
-            samplerInputs["model"] = EnsureAuraModelInput(modelInput);
+            JArray baseModelInput = new(modelInput);
+            modelInput = ApplyConfiguredLorasToSamplerModel(modelInput, Params.Tracks[0].Index);
+            samplerInputs["model"] = EnsureAuraModelInput(modelInput, Params.Tracks[0].SigmaShift);
             if (NeedsZeroedNegativeInput(samplerInputs))
             {
                 samplersNeedingZeroedNegative.Add(samplerInputs);
@@ -268,6 +178,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
             }
             EnsureSwarmKSamplerInputs(samplerInputs);
             samplerNodeIds.Add(prop.Name);
+            patchedSamplerBaseModels[prop.Name] = baseModelInput;
         }
 
         if (samplerNodeIds.Count == 0)
@@ -298,6 +209,8 @@ internal class AudioWorkflow(WorkflowGenerator g)
             clipInputs["device"] = "default";
         }
 
+        CreateAdditionalPatchedTrackOutputs(sharedClipPath, patchedSamplerBaseModels);
+
         return HasAudioNodeForPatchedSamplers(samplerNodeIds);
     }
 
@@ -321,18 +234,195 @@ internal class AudioWorkflow(WorkflowGenerator g)
         return false;
     }
 
-    private void ApplyPromptInputs(JObject encodeInputs)
+    private void CreateAdditionalPatchedTrackOutputs(JArray clipPath, Dictionary<string, JArray> patchedSamplerBaseModels)
     {
-        encodeInputs["lyrics"] = Params.Prompt;
-        encodeInputs["tags"] = Params.Style;
-        encodeInputs["seed"] = Params.ConditioningSeed;
-        encodeInputs["bpm"] = Params.Bpm;
-        encodeInputs["duration"] = Params.Duration;
-        encodeInputs["timesignature"] = Params.TimeSignature;
-        encodeInputs["language"] = Params.Language;
-        encodeInputs["keyscale"] = Params.KeyScale;
+        if (Params.Tracks.Count <= 1
+            || clipPath is null
+            || patchedSamplerBaseModels.Count == 0)
+        {
+            return;
+        }
+
+        List<PatchedSamplerOutput> samplerOutputs = GetPatchedSamplerOutputs(patchedSamplerBaseModels);
+        foreach (JsonParser.TrackSpec track in Params.Tracks.Skip(1))
+        {
+            foreach (PatchedSamplerOutput samplerOutput in samplerOutputs)
+            {
+                JArray trackClipPath = CreateTrackClipPath(track, samplerOutput.BranchIndex) ?? clipPath;
+                JArray modelPathForSampling = CreateTrackSamplerModelPath(samplerOutput.ModelPath, track);
+                _ = CreateTrackOutputBranch(
+                    trackClipPath,
+                    modelPathForSampling,
+                    samplerOutput.VaePath,
+                    track,
+                    samplerOutput.BranchIndex
+                );
+            }
+        }
+    }
+
+    private List<PatchedSamplerOutput> GetPatchedSamplerOutputs(Dictionary<string, JArray> patchedSamplerBaseModels)
+    {
+        List<PatchedSamplerOutput> outputs = [];
+        int branchIndex = 0;
+
+        foreach (JProperty prop in g.Workflow.Properties())
+        {
+            if (prop.Value is not JObject node
+                || $"{node["class_type"]}" != NodeTypes.VAEDecodeAudio
+                || node["inputs"] is not JObject decodeInputs
+                || !TryGetInputSourceId(decodeInputs, "samples", out string samplerId)
+                || !patchedSamplerBaseModels.TryGetValue(samplerId, out JArray modelPath)
+                || !TryGetInputPath(decodeInputs, "vae", out JArray vaePath))
+            {
+                continue;
+            }
+
+            if (modelPath.Count < 2)
+            {
+                continue;
+            }
+
+            outputs.Add(new(
+                BranchIndex: branchIndex,
+                ModelPath: new JArray(modelPath),
+                VaePath: new JArray(vaePath)
+            ));
+            branchIndex++;
+        }
+
+        return outputs;
+    }
+
+    private JArray CreateTrackClipPath(JsonParser.TrackSpec track, int branchIndex)
+    {
+        if (Helpers is null)
+        {
+            return null;
+        }
+
+        (string clip1Name, string clip1Url, string clip1Hash) = GetClipInfo(DefaultClip1);
+        (string clip2Name, string clip2Url, string clip2Hash) = GetClipInfo(track.LmModel);
+        string clip1 = Helpers.RequireClipModel(clip1Name, clip1Url, clip1Hash, null);
+        string clip2 = Helpers.RequireClipModel(clip2Name, clip2Url, clip2Hash, null);
+        string cacheKey = $"{clip1}|{clip2}";
+        ClipPathCache ??= [];
+        if (ClipPathCache.TryGetValue(cacheKey, out JArray cachedPath))
+        {
+            return new JArray(cachedPath);
+        }
+
+        string clipNode = g.CreateNode(NodeTypes.DualClipLoader, new JObject
+        {
+            ["clip_name1"] = clip1,
+            ["clip_name2"] = clip2,
+            ["type"] = "ace",
+            ["device"] = "default"
+        }, GetTrackNodeId(10, track.Index, branchIndex));
+        JArray clipPath = new(clipNode, 0);
+        ClipPathCache[cacheKey] = clipPath;
+        return new JArray(clipPath);
+    }
+
+    private JArray CreateTrackOutputBranch(JArray clipPath, JArray modelPath, JArray vaePath, JsonParser.TrackSpec track, int branchIndex)
+    {
+        JArray positiveConditioning = CreateTrackConditioning(
+            clipPath,
+            track,
+            GetTrackNodeId(30, track.Index, branchIndex)
+        );
+        JArray negativeConditioning = CreateTrackConditioning(
+            clipPath,
+            track,
+            GetTrackNodeId(35, track.Index, branchIndex)
+        );
+
+        string latentNode = g.CreateNode(NodeTypes.EmptyAceStepAudioLatent, new JObject
+        {
+            ["batch_size"] = g.UserInput.Get(T2IParamTypes.BatchSize, 1),
+            ["seconds"] = track.Duration
+        }, GetTrackNodeId(40, track.Index, branchIndex));
+
+        string zeroedNegativeNode = g.CreateNode(NodeTypes.ConditioningZeroOut, new JObject
+        {
+            ["conditioning"] = negativeConditioning
+        }, GetTrackNodeId(45, track.Index, branchIndex));
+
+        string samplerNode = g.CreateNode(NodeTypes.SwarmKSampler, new JObject
+        {
+            ["model"] = modelPath,
+            ["noise_seed"] = Params.Seed,
+            ["steps"] = track.Steps,
+            ["cfg"] = track.AudioCfg,
+            ["sampler_name"] = track.AudioSamplerName,
+            ["scheduler"] = track.AudioScheduler,
+            ["positive"] = positiveConditioning,
+            ["negative"] = new JArray(zeroedNegativeNode, 0),
+            ["latent_image"] = new JArray(latentNode, 0),
+            ["start_at_step"] = 0,
+            ["end_at_step"] = 10000,
+            ["return_with_leftover_noise"] = "disable",
+            ["add_noise"] = "enable",
+            ["var_seed"] = g.UserInput.Get(T2IParamTypes.VariationSeed, 0),
+            ["var_seed_strength"] = g.UserInput.Get(T2IParamTypes.VariationSeedStrength, 0),
+            ["sigma_min"] = g.UserInput.Get(T2IParamTypes.SamplerSigmaMin, -1),
+            ["sigma_max"] = g.UserInput.Get(T2IParamTypes.SamplerSigmaMax, -1),
+            ["rho"] = g.UserInput.Get(T2IParamTypes.SamplerRho, 7),
+            ["previews"] = g.UserInput.Get(T2IParamTypes.NoPreviews) ? "none" : "default",
+            ["tile_sample"] = false,
+            ["tile_size"] = 768
+        }, GetTrackNodeId(50, track.Index, branchIndex));
+
+        string decodedNode = g.CreateNode(NodeTypes.VAEDecodeAudio, new JObject
+        {
+            ["samples"] = new JArray(samplerNode, 0),
+            ["vae"] = vaePath
+        }, GetTrackNodeId(60, track.Index, branchIndex));
+
+        JArray audioPath = new(decodedNode, 0);
+        CreateTrackSaveNode(audioPath, track, branchIndex);
+        return audioPath;
+    }
+
+    private void CreateTrackSaveNode(JArray audioPath, JsonParser.TrackSpec track, int branchIndex)
+    {
+        string branchSuffix = branchIndex > 0 ? $"_{branchIndex + 1}" : "";
+        _ = g.CreateNode("SaveAudioMP3", new JObject
+        {
+            ["audio"] = audioPath,
+            ["filename_prefix"] = $"SwarmUI_track_{track.Index + 1}{branchSuffix}_",
+            ["quality"] = "V0"
+        }, GetTrackNodeId(70, track.Index, branchIndex));
+    }
+
+    private JArray CreateTrackConditioning(JArray clipPath, JsonParser.TrackSpec track, string nodeId)
+    {
+        JObject promptInputs = new()
+        {
+            ["clip"] = clipPath
+        };
+        ApplyTrackInputs(promptInputs, track);
+        string promptNode = g.CreateNode(NodeTypes.TextEncodeAceStepAudio, promptInputs, nodeId);
+        return new JArray(promptNode, 0);
+    }
+
+    private string GetTrackNodeId(int baseOffset, int trackIndex, int branchIndex)
+    {
+        return g.GetStableDynamicID(AudioIdBase + (branchIndex * 1000) + (trackIndex * 100) + baseOffset, 0);
+    }
+
+    private void ApplyTrackInputs(JObject encodeInputs, JsonParser.TrackSpec track)
+    {
+        encodeInputs["lyrics"] = track.Prompt;
+        encodeInputs["tags"] = track.Style;
+        encodeInputs["seed"] = Params.ConditioningSeed + track.Index;
+        encodeInputs["bpm"] = track.Bpm;
+        encodeInputs["duration"] = track.Duration;
+        encodeInputs["timesignature"] = track.TimeSignature;
+        encodeInputs["language"] = track.Language;
+        encodeInputs["keyscale"] = track.KeyScale;
         encodeInputs["generate_audio_codes"] = true;
-        encodeInputs["cfg_scale"] = Params.LmCfgScale;
+        encodeInputs["cfg_scale"] = track.LmCfgScale;
         encodeInputs["temperature"] = 0.85;
         encodeInputs["top_p"] = 0.9;
         encodeInputs["top_k"] = 0;
@@ -341,16 +431,37 @@ internal class AudioWorkflow(WorkflowGenerator g)
 
     private JArray ApplyConfiguredLorasToSamplerModel(JArray modelPath)
     {
+        return ApplyConfiguredLorasToSamplerModel(modelPath, 0);
+    }
+
+    private JArray ApplyConfiguredLorasToSamplerModel(JArray modelPath, int trackIndex)
+    {
         if (TryGetAuraInputs(modelPath, out JObject auraInputs))
         {
             JArray innerModelPath = GetInputPath(auraInputs, "model");
-            auraInputs["model"] = ApplyConfiguredLoras(innerModelPath);
+            auraInputs["model"] = ApplyConfiguredLoras(innerModelPath, trackIndex);
             return modelPath;
         }
-        return ApplyConfiguredLoras(modelPath);
+        return ApplyConfiguredLoras(modelPath, trackIndex);
+    }
+
+    private JArray CreateTrackSamplerModelPath(JArray baseModelPath, JsonParser.TrackSpec track)
+    {
+        JArray modelPath = new(baseModelPath);
+        if (TryGetAuraInputs(modelPath, out JObject auraInputs))
+        {
+            modelPath = GetInputPath(auraInputs, "model");
+        }
+        modelPath = ApplyConfiguredLoras(modelPath, track.Index);
+        return EnsureAuraModelInput(modelPath, track.SigmaShift);
     }
 
     private JArray ApplyConfiguredLoras(JArray modelPath)
+    {
+        return ApplyConfiguredLoras(modelPath, 0);
+    }
+
+    private JArray ApplyConfiguredLoras(JArray modelPath, int trackIndex)
     {
         if (modelPath.Count < 2)
         {
@@ -358,7 +469,7 @@ internal class AudioWorkflow(WorkflowGenerator g)
         }
 
         ExistingLoraChain existingChain = ExtractExistingLoraChain(modelPath);
-        List<AceStepLora> configuredLoras = AceStepLoraParser.ResolveRelevantLoras(g.UserInput, g.ModelFolderFormat);
+        List<AceStepLora> configuredLoras = AceStepLoraParser.ResolveRelevantLoras(g.UserInput, g.ModelFolderFormat, trackIndex);
         List<AceStepLora> combinedLoras = [];
         HashSet<string> seenLoras = [];
 
@@ -498,6 +609,11 @@ internal class AudioWorkflow(WorkflowGenerator g)
 
     private JArray EnsureAuraModelInput(JArray modelPath)
     {
+        return EnsureAuraModelInput(modelPath, Params.SigmaShift);
+    }
+
+    private JArray EnsureAuraModelInput(JArray modelPath, double sigmaShift)
+    {
         if (modelPath.Count < 2)
         {
             return [];
@@ -505,14 +621,14 @@ internal class AudioWorkflow(WorkflowGenerator g)
 
         if (TryGetAuraInputs(modelPath, out JObject auraInputs))
         {
-            auraInputs["shift"] = Params.SigmaShift;
+            auraInputs["shift"] = sigmaShift;
             return modelPath;
         }
 
         string auraNode = g.CreateNode(NodeTypes.ModelSamplingAuraFlow, new JObject
         {
             ["model"] = modelPath,
-            ["shift"] = Params.SigmaShift
+            ["shift"] = sigmaShift
         });
         return new JArray(auraNode, 0);
     }
@@ -662,9 +778,19 @@ internal class AudioWorkflow(WorkflowGenerator g)
             && aceEncodeNodeIds.Contains(conditioningNodeId);
     }
 
+    private List<JsonParser.TrackSpec> GetTracks()
+    {
+        return new JsonParser(g).ParseTracks();
+    }
+
     private string ResolvePrompt()
     {
-        return PromptParser.ResolvePrompt(g.UserInput);
+        return ResolvePrompt(0);
+    }
+
+    private string ResolvePrompt(int trackIndex)
+    {
+        return PromptParser.ResolvePrompt(g.UserInput, trackIndex);
     }
 
     private static bool IsInputFromNodeSet(JObject inputs, string inputName, HashSet<string> nodeIds)
@@ -709,51 +835,6 @@ internal class AudioWorkflow(WorkflowGenerator g)
         }
         sourceNodeId = $"{path[0]}";
         return !string.IsNullOrWhiteSpace(sourceNodeId);
-    }
-
-    private T GetUserParam<T>(T2IRegisteredParam<T> primary, T2IRegisteredParam<T> fallback)
-    {
-        T defaultValue = GetParamDefault(primary);
-        bool hasPrimary = HasRaw(primary);
-        bool hasFallback = HasRaw(fallback);
-        T primaryValue = hasPrimary ? g.UserInput.Get(primary, defaultValue) : defaultValue;
-        T fallbackValue = hasFallback ? g.UserInput.Get(fallback, defaultValue) : defaultValue;
-
-        if (hasPrimary && !hasFallback)
-        {
-            return primaryValue;
-        }
-        if (!hasPrimary && hasFallback)
-        {
-            return fallbackValue;
-        }
-        if (hasPrimary && hasFallback)
-        {
-            // If primary is only default-valued while fallback is explicitly set, prefer fallback.
-            if (EqualityComparer<T>.Default.Equals(primaryValue, defaultValue))
-            {
-                return fallbackValue;
-            }
-            return primaryValue;
-        }
-        return g.UserInput.Get(primary, defaultValue);
-    }
-
-    private static T GetParamDefault<T>(T2IRegisteredParam<T> param)
-    {
-        if (param?.Type is null)
-        {
-            return default;
-        }
-
-        T2IParamSet defaultSet = new();
-        defaultSet.Set(param.Type, param.Type.Default ?? "");
-        return defaultSet.Get(param);
-    }
-
-    private bool HasRaw<T>(T2IRegisteredParam<T> param)
-    {
-        return param?.Type is not null && g.UserInput.TryGetRaw(param.Type, out _);
     }
 
     private T2IModel GetSelectedAceModel()
